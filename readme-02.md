@@ -7,6 +7,7 @@
     - [1) bootstrap.yml](#2.2.1)   
     - [2) 启动注册中心](#2.2.2)   
     - [3) 访问http://localhost:8761](#2.2.3)   
+    - [4) 多注册中心](#2.2.4)   
 
 
 
@@ -173,8 +174,34 @@ Status下显示的是我们在bootstrap.yml里的instance-id，如下所示，�
     instance-id: ${spring.application.name}:${server.port}
 ```
 
+<h3 id="2.2.4">4) 多注册中心</h3>
 
+假设我们有两个注册中心8761、8762，那么他们之间需要相互注册
+```
+server:
+  port: 8761
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/,http://local.register.com:8762/eureka/
+```
 
+```
+server:
+  port: 8762
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/,http://local.register.com:8762/eureka/
+```
+
+作为eureka的client，它可以只配置一个注册中心，也可以配置多注册中心。因为多注册中心之间会相互同步注册信息。
+```
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/
+```
 
 
 
