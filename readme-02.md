@@ -682,10 +682,15 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 - oauth-center
   - sql
+    - cloud_oauth.sql
   - src
     - main
       - java
         - com.cloud.oauth
+          - config
+          - controller
+          - feign
+          - service.impl
           - OAuthCenterApplication.java
       - resources
         - .gitignore
