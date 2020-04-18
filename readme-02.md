@@ -14,6 +14,17 @@
     - [3) 端口](#2.3.3)   
     - [4) 注册到注册中心](#2.3.4)   
     - [5) 注册中心里的显示](#2.3.5)   
+  - [2.4 用户中心](#2.4)   
+    - [1) 数据库脚本](#2.4.1)   
+    - [2) bootstrap.yml](#2.4.2)   
+    - [3) user-center.yml](#2.4.3)   
+    - [4) 配置类](#2.4.4)   
+
+
+
+
+
+
 
 
 
@@ -289,6 +300,8 @@ native:
     - production
     - test
 
+生产版本我们可以在启动服务```java -jar xxx.jar```时，指定运行环境参数（命令行优先）。
+
 <h3 id="2.3.3">3) 端口</h3>
 
 ```
@@ -337,9 +350,222 @@ eureka:
 
 
 
+<h2 id="2.4">2.4 用户中心</h2>
+
+- user-center
+  - sql
+  - src
+    - main
+      - java
+        - com.cloud.user
+          - UserCenterApplication.java
+      - resources
+        - mybatis-mappers
+        - .gitignore
+        - bootstrap.yml
+    - test
+  - .gitignore
+  - pom.xml
+  - README.md
 
 
+<h3 id="2.4.1">1) 数据库脚本</h3>
 
+在user-center模块下的sql文件夹下cloud_user.sql里是用户中心的数据脚本，包含建表语句和初始化数据。
+
+<h3 id="2.4.3">2) bootstrap.yml</h3>
+
+```
+spring:
+  application:
+    name: user-center
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-center
+      profile: dev
+      fail-fast: true
+server:
+  port: 0
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/
+    registry-fetch-interval-seconds: 5
+  instance:
+    lease-expiration-duration-in-seconds: 15
+    lease-renewal-interval-in-seconds: 5
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.int}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+```
+
+这里只列出主要配置，配置中心的serviceId就是配置中心的spring.application.name，还有自己的profile，还有注册中心的url。
+
+<h3 id="2.4.3">3) user-center.yml</h3>
+
+
+cloud-service\config-center\src\main\resources\configs\dev\
+* user-center.yml
+这里配置了用户系统具体的一些配置，比如数据库、mq、mybatis、日志级别等。
+
+#### a) 日志级别和文件配置
+```
+logging:
+  level:
+    root: info
+    com.cloud: debug
+  file: logs/${spring.application.name}.log
+```
+
+#### b) 数据源配置
+```
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://local.mysql.com:3306/cloud_user?useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: mysql
+```
+
+#### c) Rabbitmq 配置
+```
+  rabbitmq:
+    host: local.rabbitmq.com
+    port: 5672
+    username: cloud-dev
+    password: cloud-dev
+    virtual-host: /
+```
+
+#### d) redis 配置
+```
+ redis:
+    host: local.redis.com
+    port: 6379
+    password:
+    timeout: 10s
+```
+
+#### e) Mybatis 配置
+```
+mybatis:
+  type-aliases-package: com.cloud.model.user
+  mapper-locations: classpath:/mybatis-mappers/*
+  configuration:
+    mapUnderscoreToCamelCase: true
+```
+
+别名包（type-aliases-package）有多个值的话，逗号隔开。
+
+复杂sql写在mapper.xml文件里，存放路径要与mapper-locations配置的路径对应。
+
+#### f) 微信公众号配置
+```
+wechat:
+  domain: http://api.gateway.com:8080/api-u
+  infos:
+    app1:
+      appid: xxx
+      secret: xxx
+    app2:
+      appid: xxx
+      secret: xxx
+```
+详细看下代码
+* cloud-service\user-center\src\main\java\com\cloud\user\service\impl\WechatServiceImpl.java
+* cloud-service\manage-backend\src\main\resources\static\pages\wechat\index.html
+
+
+<h3 id="2.4.4">4) 配置类</h3>
+- com.cloud.user
+  - config
+    - AsycTaskExecutorConfig.java
+    - ExceptionHandlerAdvice.java
+    - RabbitmqConfig.java
+    - ResourceServerConfig.java
+    - RestTemplateConfig.java
+    - SessionConfig.java
+    - SwaggerConfig.java
+    - WechatConfig.java
+
+#### a) 全局异常处理
+```
+@RestControllerAdvice
+public class ExceptionHandlerAdvice {
+
+	@ExceptionHandler({IllegalArgumentException.class})
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public Map<String, Object> badRequestException(IllegalArgumentException exception) {
+		Map<String, Object> data = new HashMap<>();
+		data.put("code", HttpStatus.BAD_REQUEST.value());
+		data.put("message", exception.getMessage());
+
+		return data;
+	}
+}
+```
+抛出 java.lang.IllegalArgumentException 异常的接口将返回http状态码400。
+
+#### b) Rabbitmq的exchange声明
+```
+@Configuration
+public class RabbitmqConfig {
+
+	@Bean
+	public TopicExchange topicExchange() {
+		return new TopicExchange(UserCenterMq.MQ_EXCHANGE_USER);
+	}
+}
+```
+这里声明一个topic类型的exchange，发消息时用。
+
+#### c) 资源权限配置
+```
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http.csrf().disable().exceptionHandling()
+                .authenticationEntryPoint(
+                        (request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+                .and().authorizeRequests()
+                .antMatchers(PermitAllUrl.permitAllUrl("/users-anon/**", "/wechat/**")).permitAll() // 放开权限的url
+                .anyRequest().authenticated().and().httpBasic();
+    }
+
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+}
+```
+
+* ```@EnableResourceServer```将我们的项目作为资源服务器
+* ```prePostEnabled = true```是启动权限注解支持
+* ```.antMatchers(PermitAllUrl.permitAllUrl("/users-anon/**", "/wechat/**")).permitAll()```这里符合规则的url将不做权限拦截
+
+
+#### d) 密码加密处理器
+```
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+```
+声明一个密码加密和校验处理器Bean，该bean是spring security自带的。
 
 
 
