@@ -4,6 +4,9 @@
 - [2丨模块和配置](#2)   
   - [2.1 父pom.xml](#2.1)   
   - [2.2 注册中心](#2.2)   
+    - [1) bootstrap.yml](#2.2.1)   
+    - [2) 启动注册中心](#2.2.2)   
+    - [3) 访问http://localhost:8761](#2.2.3)   
 
 
 
@@ -12,7 +15,7 @@
 ---
 ---
 ---
-<h2 id="1">1丨项目结构</h2>
+<h1 id="1">1丨项目结构</h1>
 
 ---
 
@@ -40,7 +43,7 @@
 
 
 ---
-<h2 id="2">2丨模块和配置</h2>
+<h1 id="2">2丨模块和配置</h1>
 
 ---
 
@@ -60,7 +63,7 @@
 | user-center | 用户中心、用户、角色、权限 |
 
 
-<h3 id="2.1">2.1 父pom.xml</h3>
+<h2 id="2.1">2.1 父pom.xml</h2>
 
 **配置的各个模块目录**
 ```
@@ -101,7 +104,36 @@
 ```
 
 
-<h3 id="2.2">2.2 注册中心</h3>
+<h2 id="2.2">2.2 注册中心</h2>
+
+- register-center
+  - src
+      - main
+         - java
+             - com.cloud.register
+               - RegisterCenterApplication.java
+         - resources
+           - .gitignore
+           - bootstrap.yml
+  - .gitignore
+  - pom.xml
+  - README.md
 
 
+<h3 id="2.2.1">1) bootstrap.yml</h3>
+
+给应用取名字，设置启动端口号
+```
+spring:
+  application:
+    name: register-center
+server:
+  port: 8761
+```
+
+<h3 id="2.2.2">2) 启动注册中心</h3>
+
+直接运行 **RegisterCenterApplication.java** 的main方法
+
+<h3 id="2.2.3">3) 访问http://localhost:8761</h3>
 
