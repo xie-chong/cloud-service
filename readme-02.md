@@ -20,7 +20,11 @@
     - [2) bootstrap.yml](#2.4.2)   
     - [3) user-center.yml](#2.4.3)   
     - [4) 配置类](#2.4.4)   
-
+  - [2.5 认证中心](#2.5)   
+    - [1) 数据库脚本](#2.5.1)   
+    - [2) bootstrap.yml](#2.5.2)   
+    - [3) oauth-center.yml](#2.5.3)   
+    - [4) 配置类](#2.5.4)   
 
 
 
@@ -701,6 +705,179 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
   - pom.xml
   - README.md
 
+<h3 id="2.5.1">1) 数据库脚本</h3>
+
+在 oauth-center 模块下的 sql 文件夹下 cloud_oauth.sql 里是认证中心的数据脚本，包含建表语句和初始化数据。
+
+<h3 id="2.5.3">2) bootstrap.yml</h3>
+
+除了 spring.application.name 之外外，其他配置与用户中心的 bootstrap.yml 相同。
+
+<h3 id="2.5.3">3) oauth-center.yml</h3>
+
+#### a) redis 配置
+```
+  redis:
+    host: local.redis.com
+    port: 6379
+    password:
+```
+
+如redis有密码，与host同层级加节点password。**注意** password 冒号后加一个空格。
+```
+  redis:
+    host: local.redis.com
+    port: 6379
+    password: aaaa
+```
+
+#### b) 数据库配置
+
+```
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://local.mysql.com:3306/cloud_user?useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: mysql
+```
+
+#### c) token 是否用 jwt
+```
+access_token:
+  store-jwt: false
+  jwt-signing-key: xiao@wei@jia@gou=$==+_+%0%:)(:)
+  add-userinfo: false
+```
+
+* false 的话 token 是默认的 uuid
+* true 的话 token 将采用 jwt
+
+com.cloud.oauth.config.AuthorizationServerConfig.java
+```
+   /**
+     * 使用jwt或者redis<br>
+     * 默认redis
+     */
+    @Value("${access_token.store-jwt:false}")
+    private boolean storeWithJwt;
+
+    /**
+     * 令牌存储
+     */
+    @Bean
+    public TokenStore tokenStore() {
+        if (storeWithJwt) {
+            return new JwtTokenStore(accessTokenConverter());
+        }
+        RedisTokenStore redisTokenStore = new RedisTokenStore(redisConnectionFactory);
+        // 2018.08.04添加,解决同一username每次登陆access_token都相同的问题
+        redisTokenStore.setAuthenticationKeyGenerator(new RandomAuthenticationKeyGenerator());
+
+        return redisTokenStore;
+    }
+
+```
+
+使用jwt时，需要配置这个签名key，具体可看下     com.cloud.oauth.config.AuthorizationServerConfig.java 里面的代码
+```
+   /**
+     * jwt签名key，可随意指定<br>
+     * 如配置文件里不设置的话，冒号后面的是默认值
+     */
+    @Value("${access_token.jwt-signing-key:xiaoweijiagou}")
+    private String signingKey;
+
+    /**
+     * Jwt资源令牌转换器<br>
+     * 参数access_token.store-jwt为true时用到
+     *
+     * @return accessTokenConverter
+     */
+    @Bean
+    public JwtAccessTokenConverter accessTokenConverter() {
+        JwtAccessTokenConverter jwtAccessTokenConverter = new JwtAccessTokenConverter() {
+            @Override
+            public OAuth2AccessToken enhance(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
+                OAuth2AccessToken oAuth2AccessToken = super.enhance(accessToken, authentication);
+                addLoginUserInfo(oAuth2AccessToken, authentication); // 2018.07.13 将当前用户信息追加到登陆后返回数据里
+                return oAuth2AccessToken;
+            }
+        };
+        DefaultAccessTokenConverter defaultAccessTokenConverter = (DefaultAccessTokenConverter) jwtAccessTokenConverter
+                .getAccessTokenConverter();
+        DefaultUserAuthenticationConverter userAuthenticationConverter = new DefaultUserAuthenticationConverter();
+        userAuthenticationConverter.setUserDetailsService(userDetailsService);
+
+        defaultAccessTokenConverter.setUserTokenConverter(userAuthenticationConverter);
+        // 2018.06.29 这里务必设置一个，否则多台认证中心的话，一旦使用jwt方式，access_token将解析错误
+        jwtAccessTokenConverter.setSigningKey(signingKey);
+
+        return jwtAccessTokenConverter;
+    }
+```
+
+<h3 id="2.5.4">4) 配置类</h3>
+
+- oauth-center
+  - sql
+    - cloud_oauth.sql
+  - src
+    - main
+      - java
+        - com.cloud.oauth
+          - config
+            - AuthorizationServerConfig.java
+            - PasswordEncoderConfig.java
+            - ResourceServerConfig.java
+            - SecurityConfig.java
+            - SessionConfig.java
+            - SwaggerConfig.java
+
+#### a) 授权服务器配置
+
+```
+/**
+ * 授权服务器配置
+ *
+ */
+@Configuration
+@EnableAuthorizationServer
+public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {
+```
+
+#### b) 资源服务器
+```
+/**
+ * 资源服务配置<br>
+ *
+ * 注解@EnableResourceServer帮我们加入了org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter<br>
+ * 该filter帮我们从request里解析出access_token<br>
+ * 并通过org.springframework.security.oauth2.provider.token.DefaultTokenServices根据access_token和认证服务器配置里的TokenStore从redis或者jwt里解析出用户
+ *
+ * 注意认证中心的@EnableResourceServer和别的微服务里的@EnableResourceServer有些不同<br>
+ * 别的微服务是通过org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices来获取用户的
+ *
+ * @author 小威老师 xiaoweijiagou@163.com
+ *
+ */
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+```
+
+#### c) Session共享配置
+```
+/**
+ * 开启session共享
+ *
+ */
+@EnableRedisHttpSession
+public class SessionConfig {
+
+}
+```
+用 redis 做 session 共享，在授权码模式下，可能会涉及参数 code 和 state 和 redirect_url 的传递，多台服务器下需要共享 session 。（目前该项目没用授权码模式，此处不设置也没问题）。
 
 
 
