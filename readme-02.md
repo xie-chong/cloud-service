@@ -14,6 +14,7 @@
     - [3) 端口](#2.3.3)   
     - [4) 注册到注册中心](#2.3.4)   
     - [5) 注册中心里的显示](#2.3.5)   
+    - [6) 配置中心底层核心源码](#2.3.6)   
   - [2.4 用户中心](#2.4)   
     - [1) 数据库脚本](#2.4.1)   
     - [2) bootstrap.yml](#2.4.2)   
@@ -347,7 +348,103 @@ eureka:
 **注意**: 那个随机数字，并不是真正的端口号，点击跳转到 http://ip:53484/info 之后，我们才能看到真正的端口号。
 
 
+<h3 id="2.3.6">6) 配置中心底层核心源码</h3>
 
+其原理是通过 config client 发起 http restful 请求到 config server 获取配置信息。（MVC模式）
+
+#### 配置中心底层核心源码 client 端：
+
+- org.springframework.cloud.config
+  - client
+    - ConfigClientAutoConfiguration.class
+    - ConfigClientHealthProperties.class
+    - ConfigClientProperties.class
+    - ConfigClientStateHolder.class
+    - ConfigClientWatch.class
+    - ConfigServerHealthIndicator.class
+    - ConfigServerInstanceProvider.class
+    - ConfigServiceBootstrapConfiguration.class
+    - ConfigServicePropertySourceLocator.class
+    - DiscoveryClientConfigServiceBootstrapConfiguration.class
+    - RetryProperties.class
+
+其中 ConfigServerInstanceProvider.class 里的方法 getConfigServerInstances(String serviceId) 正好与我们的客户端配置的 serviceId 对应。
+
+```
+public class ConfigServerInstanceProvider {
+    private static Log logger = LogFactory.getLog(ConfigServerInstanceProvider.class);
+    private final DiscoveryClient client;
+
+    public ConfigServerInstanceProvider(DiscoveryClient client) {
+        this.client = client;
+    }
+
+    @Retryable(
+        interceptor = "configServerRetryInterceptor"
+    )
+    public List<ServiceInstance> getConfigServerInstances(String serviceId) {
+        logger.debug("Locating configserver (" + serviceId + ") via discovery");
+        List<ServiceInstance> instances = this.client.getInstances(serviceId);
+        if (instances.isEmpty()) {
+            throw new IllegalStateException("No instances found of configserver (" + serviceId + ")");
+        } else {
+            logger.debug("Located configserver (" + serviceId + ") via discovery. No of instances found: " + instances.size());
+            return instances;
+        }
+    }
+}
+```
+
+```
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-center
+      profile: dev
+      fail-fast: true
+```
+
+
+
+#### 配置中心底层核心源码 server 端：
+
+- org.springframework.cloud.config
+  - server
+      - environment
+        - EnvironmentController.class
+
+其中 EnvironmentController.class 里的方法 labelled 正好与我们的客户端发起的请求对应。（可以自己拼接url在浏览器中访问）
+```
+@RestController
+@RequestMapping(
+    method = {RequestMethod.GET},
+    path = {"${spring.cloud.config.server.prefix:}"}
+)
+public class EnvironmentController {
+  // 省略部分代码
+
+    @RequestMapping({"/{name}/{profiles}/{label:.*}"})
+    public Environment labelled(@PathVariable String name, @PathVariable String profiles, @PathVariable String label) {
+        if (name != null && name.contains("(_)")) {
+            name = name.replace("(_)", "/");
+        }
+
+        if (label != null && label.contains("(_)")) {
+            label = label.replace("(_)", "/");
+        }
+
+        Environment environment = this.repository.findOne(name, profiles, label);
+        if (this.acceptEmpty || environment != null && !environment.getPropertySources().isEmpty()) {
+            return environment;
+        } else {
+            throw new EnvironmentNotFoundException("Profile Not found");
+        }
+    }
+
+     // 省略部分代码
+}
+```
 
 
 <h2 id="2.4">2.4 用户中心</h2>
