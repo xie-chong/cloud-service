@@ -513,7 +513,7 @@ management:
 cloud-service\config-center\src\main\resources\configs\dev\
 * user-center.yml
 
-这里配置了用户系统具体的一些配置，比如数据库、mq、mybatis、日志级别等。
+这里配置了用户系统具体的一些配置，比如数据库、mq、mybatis、日志级别、鉴权等。
 
 #### a) 日志级别和文件配置
 ```
@@ -566,7 +566,16 @@ mybatis:
 
 复杂sql写在mapper.xml文件里，存放路径要与mapper-locations配置的路径对应。
 
-#### f) 微信公众号配置
+#### f) 鉴权
+```
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://local.gateway.com:8080/api-o/user-me
+      prefer-token-info: false
+```
+
+#### g) 微信公众号配置
 ```
 wechat:
   domain: http://api.gateway.com:8080/api-u
