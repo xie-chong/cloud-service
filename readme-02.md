@@ -8,6 +8,14 @@
     - [2) 启动注册中心](#2.2.2)   
     - [3) 访问http://localhost:8761](#2.2.3)   
     - [4) 多注册中心](#2.2.4)   
+  - [2.3 配置中心](#2.3)   
+    - [1) bootstrap.yml](#2.3.1)   
+    - [2) {profile}](#2.3.2)   
+    - [3) 端口](#2.3.3)   
+    - [4) 注册到注册中心](#2.3.4)   
+    - [5) 注册中心里的显示](#2.3.5)   
+
+
 
 
 
@@ -204,8 +212,126 @@ eureka:
 ```
 
 
+<h2 id="2.3">2.3 配置中心</h2>
 
+- config-center
+  - src
+    - main
+      - java
+        - com.cloud.config
+          - ConfigCenterApplication.java
+      - resources
+        - configs.dev
+          - file-center.yml
+          - gateway-zuul.yml
+          - log-center.yml
+          - manage-backend.yml
+          - notification-center.yml
+          - oauth-center.yml
+          - user-center.yml
+          - bootstrap.yml
+  - .gitignore
+  - config-center.iml
+  - pom.xml
+  - README.md
 
+<h3 id="2.3.1">1) bootstrap.yml</h3>
+
+配置在本地或者git
+```
+spring:
+  application:
+    name: config-center
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          searchLocations: classpath:/configs/{profile}
+#          searchLocations: file:/d:/configs/{profile}
+        git:
+          uri: https://gitee.com/zhang.w/cloud-service-configs.git
+          default-label: master
+          force-pull: true
+          searchPaths: '{profile}'
+```
+通过spring.profiles.active这里可以指定配置文件在本地classpath下,还是在远程git上面，这里默认是放在了本地的classpath下，这里可根据实际项目需求和运维条件进行合理的选择配置方式。
+
+<h3 id="2.3.2">2) {profile}</h3>
+
+上面示例配置代码中的{profile}，是由别的微服务指定的，如用户中心指定配置，用户中心里会有如下配置
+cloud-service\user-center\src\main\resources\bootstrap.yml
+```
+spring:
+  application:
+    name: user-center
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        serviceId: config-center
+      profile: dev
+      fail-fast: true
+```
+
+这里的profile: dev就会注入到
+```
+native:
+          searchLocations: classpath:/configs/{profile}
+```
+
+配置目录就成了classpath:/configs/dev  ,用户中心启动的时候，就会从配置中心拉取配置，目录就是classpath:/configs/dev/user-center.yml  ,因此用户中心通过配置test或者production等等自定义的字符串，启动时会去找相应的配置，来达到分环境配置的目的，如
+
+- src/main/resources
+  - configs
+    - dev
+    - production
+    - test
+
+<h3 id="2.3.3">3) 端口</h3>
+
+```
+server:
+  port: 0
+```
+这里配置成0，启动时，项目会随机一个端口号。
+
+<h3 id="2.3.4">4) 注册到注册中心</h3>
+
+```
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/
+```
+**注意**，地址后面有个**/eureka/**  。如果是多注册中心，那么通过逗号分隔
+
+<h3 id="2.3.5">5) 注册中心里的显示</h3>
+
+```
+server:
+  port: 0
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://local.register.com:8761/eureka/
+    registry-fetch-interval-seconds: 5
+  instance:
+    lease-expiration-duration-in-seconds: 15
+    lease-renewal-interval-in-seconds: 5
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.int}
+```
+
+因为我们是随机端口号，我们这里用了随机数字来显示
+
+| Status |
+| :----- |
+| UP(2)-[config-center:523766122](http://ip:port/info),[config-center:838191004](http://ip:port/info) |
+| UP(1)-[register-center:8761](http://ip:8761/info) |
+
+**注意**: 那个随机数字，并不是真正的端口号，点击跳转到 http://ip:53484/info 之后，我们才能看到真正的端口号。
 
 
 
