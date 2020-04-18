@@ -415,6 +415,7 @@ management:
 
 cloud-service\config-center\src\main\resources\configs\dev\
 * user-center.yml
+
 这里配置了用户系统具体的一些配置，比如数据库、mq、mybatis、日志级别等。
 
 #### a) 日志级别和文件配置
