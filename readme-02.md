@@ -137,3 +137,64 @@ server:
 
 <h3 id="2.2.3">3) 访问http://localhost:8761</h3>
 
+给应用取名字，设置启动端口号
+```
+spring:
+  application:
+    name: register-center
+server:
+  port: 8761
+```
+
+<h3 id="2.2.2">2) 启动注册中心</h3>
+
+直接运行 **RegisterCenterApplication.java** 的main方法
+
+<h3 id="2.2.3">3) 访问http://localhost:8761</h3>
+
+8761是bootstrap.yml里配置的系统端口号
+
+**Spring Eureka 界面部分信息**
+
+**Instances currently registered with Eureka**
+
+| Application | AMIs | Availiability Zones | Status |
+| :-----: | :-----: | :-----: | :-----: |
+| REGISTER-CENTER | n/a(1) | (1) | UP(1)-[register-center:8761](http://ip:8761/info) |
+
+Application列下的，REGISTER-CENTER就是我们在bootstrap.yml里指定的应用名，注册中心给我们大写处理了。
+Status下显示的是我们在bootstrap.yml里的instance-id，如下所示，我们这里是应用名加端口号。 该配置为true的话，是用ip注册，否则是主机名注册，强烈建议配置为true。 点击会跳转到类似如下的地址http://ip:8761/info。 用这种方式，我们可以看到服务的具体ip地址和端口。
+```
+  instance:
+    lease-expiration-duration-in-seconds: 15
+    lease-renewal-interval-in-seconds: 5
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
