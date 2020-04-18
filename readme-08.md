@@ -40,7 +40,7 @@
 
 <h2 id="1.2">1.2 修改register-center的bootstrap.yml</h2>
 
-如下所示，加入以下节点，其中name和password是自定义的
+如下所示，加入 **security** 节点，其中name和password是自定义的
 
 ```
 spring:
@@ -117,7 +117,7 @@ spring:
       defaultZone: http://local.register.com:${server.port}/eureka/
  ```
  
-有了该节点，微服务才去将自己注册到eureka上，如果我们的eureka添加了security的密码验证，那么该配置也需要改动以下(所有需要注册的服务，包括注册中心)，否则将连接不到eureka。
+有了该节点，微服务才去将自己注册到eureka上，如果我们的eureka添加了security的密码验证，那么该配置也需要改动一下(所有需要注册的服务，包括注册中心)，否则将连接不到eureka。
 
 格式如下：   
 ```
