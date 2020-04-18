@@ -678,7 +678,23 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 
 
+<h2 id="2.5">2.5 认证中心</h2>
 
+- oauth-center
+  - sql
+  - src
+    - main
+      - java
+        - com.cloud.oauth
+          - OAuthCenterApplication.java
+      - resources
+        - .gitignore
+        - bootstrap.yml
+  - test
+  - .gitignore
+  - oauth-center.iml
+  - pom.xml
+  - README.md
 
 
 
