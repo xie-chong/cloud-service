@@ -709,7 +709,7 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 在 oauth-center 模块下的 sql 文件夹下 cloud_oauth.sql 里是认证中心的数据脚本，包含建表语句和初始化数据。
 
-<h3 id="2.5.3">2) bootstrap.yml</h3>
+<h3 id="2.5.2">2) bootstrap.yml</h3>
 
 除了 spring.application.name 之外外，其他配置与用户中心的 bootstrap.yml 相同。
 
