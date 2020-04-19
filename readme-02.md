@@ -41,7 +41,10 @@
     - [2) 配置类](#2.9.2)   
     - [3) 处理日志消息](#2.9.3)   
     - [4) 日志存储 mysql 和 elasticsearch 切换](#2.9.4) 
-
+  - [2.10 日志中心](#2.9)   
+    - [1) manage-backend.yml](#2.10.1)   
+    - [2) 消息处理](#2.10.2)   
+    - [3) 静态资源](#2.10.3)   
 
 
 
@@ -1491,7 +1494,137 @@ public class LogServiceImpl implements LogService {
 
 
 
+<h2 id="2.10">2.10 后台管理系统</h2>
 
+- manage-backend
+  - sql
+    - cloud_backend.sql
+  - src
+    - main
+      - java
+        - com.cloud.backend
+          - config >
+          - consumer >
+          - controller >
+          - dao >
+          - model >
+          - service >
+          - ManageBackendApplication.java
+      - resources
+        - mybatis-mappers >
+        - static >
+        - .gitignore
+        - bootstrap.yml
+  - .gitignore
+  - manage-backend.iml
+  - pom.xml
+  - README.md
+
+bootstrap.yml 里 spring.application.name 为 manage-backend 其余跟用户中心的一样。
+
+<h3 id="2.10.1">1) manage-backend.yml</h3>
+
+#### a) 数据库和 mq
+```
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://local.mysql.com:3306/cloud_backend?useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: mysql
+  rabbitmq:
+    host: local.rabbitmq.com
+    port: 5672
+    username: cloud-dev
+    password: cloud-dev
+    virtual-host: /
+```
+
+#### b) 邮件配置
+```
+  mail:
+    default-encoding: UTF-8
+    host: smtp.163.com
+    username:
+    password:
+    protocol: smtp
+    test-connection: false
+#    properties:
+#      mail.smtp.auth: true
+```
+* 不发邮件的话，请忽略即可。
+* 如要使用邮件模块发邮件，请写上正确的 username 和 password ，并且将最后两行的注释配置打开，否则发邮件可能会失败。
+
+163邮箱如何开启POP3/SMTP/IMAP服务？   
+http://help.163.com/10/0312/13/61J0LI3200752CLQ.html
+
+<h3 id="2.10.2">2) 消息处理</h3>
+
+```
+/**
+ * 删除角色时，处理消息
+ *
+ */
+@Slf4j
+@Component
+@RabbitListener(queues = RabbitmqConfig.ROLE_DELETE_QUEUE)
+public class RoleDeleteConsumer {
+
+	@Autowired
+	private RoleMenuDao roleMenuDao;
+
+	/**
+	 * 接收到删除角色的消息<br>
+	 * 删除角色和菜单关系
+	 * @param roleId
+	 */
+	@RabbitHandler
+	public void roleDeleteHandler(Long roleId) {
+		log.info("接收到删除角色的消息,roleId:{}", roleId);
+		try {
+			roleMenuDao.delete(roleId, null);
+		} catch (Exception e) {
+			log.error("角色删除消息处理异常", e);
+		}
+	}
+}
+```
+用户系统删除角色时，会抛消息，后台系统将接收该消息，删除菜单与角色的关系。
+
+<h3 id="2.10.3">3) 静态资源</h3>
+
+- resources
+  - static
+    - css >
+    - fonts >
+    - img >
+    - js >
+    - layui >
+    - pages >
+    - index.html
+    - login.html
+    - login-sms.html
+    - .gitignore
+    - bootstrap.yml
+
+该目录的静态文件和页面是后台管理服务一部分，可单独拿出来部署。
+
+- js
+  - bootstrap >
+  - libs >
+  - my >
+  - plugin >
+  - constant.js
+  - jq.js
+  - main.js
+
+constant.js 里定义了一个常量
+```
+// 我们这里demo是直接访问网关的，因此domainName配置的是后端java服务网关层的域名和端口，
+// 正式生产为了保证网关的高可用性，肯定是部署了多个网关服务，然后用nginx反向代理的
+// 那么多个网关服务或者生产环境的话，我们这里配置的是nginx的地址
+var domainName = "http://api.gateway.com:8080";
+```
 
 
 
