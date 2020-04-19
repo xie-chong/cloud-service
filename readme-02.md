@@ -40,7 +40,7 @@
     - [1) log-center.yml](#2.9.1)   
     - [2) 配置类](#2.9.2)   
     - [3) 处理日志消息](#2.9.3)   
-    - [4) 日志存储mysql和elasticsearch切换](#2.9.4) 
+    - [4) 日志存储 mysql 和 elasticsearch 切换](#2.9.4) 
 
 
 
@@ -1458,7 +1458,7 @@ public class LogConsumer {
 ```
 从队列中处理消息，将日志存入数据库。
 
-<h3 id="2.9.4">4) 日志存储mysql和elasticsearch切换</h3>
+<h3 id="2.9.4">4) 日志存储 mysql 和 elasticsearch 切换</h3>
 
 - log-center
   - sql
