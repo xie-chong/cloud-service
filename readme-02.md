@@ -45,7 +45,7 @@
     - [1) manage-backend.yml](#2.10.1)   
     - [2) 消息处理](#2.10.2)   
     - [3) 静态资源](#2.10.3)   
-
+  - [2.11 监控中心](#2.11)   
 
 
 
@@ -1625,6 +1625,36 @@ constant.js 里定义了一个常量
 // 那么多个网关服务或者生产环境的话，我们这里配置的是nginx的地址
 var domainName = "http://api.gateway.com:8080";
 ```
+
+
+
+
+
+
+
+<h2 id="2.11">2.11 监控中心</h2>
+
+- monitor-center
+  - src
+    - main
+      - java
+        - com.admin.cloud.monitor
+          - MonitorApplication.java
+      - resources
+        - bootstrap.yml
+  - .gitignore
+  - monitor-center.iml
+  - pom.xml
+  - README.md
+
+bootstrap.yml 里指定了固定的端口号9001,访问 http://localhost:9001 即可查看监控界面。
+
+
+
+
+
+
+
 
 
 
