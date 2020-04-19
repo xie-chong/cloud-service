@@ -887,3 +887,160 @@ public class SessionConfig {
 
 
 
+<h2 id="2.6">2.6 文件中心</h2>
+
+- file-center
+  - sql
+    - cloud_file.sql
+  - src
+    - main
+      - java
+        - com.cloud.file
+          - config
+          - controller
+          - dao
+          - model
+          - service
+          - utils
+          - FileCenterApplication.java
+      - resources
+        - mybatis-mappers
+        - .gitignore
+        - bootstrap.yml
+  - .gitignore
+  - file-center.iml
+  - pom.xml
+  - README.md
+
+
+<h3 id="2.6.1">1) 数据库脚本</h3>
+
+在 file-center 模块下的 sql 文件夹下 cloud_file.sql 里是认证中心的数据脚本，包含建表语句和初始化数据。
+
+<h3 id="2.6.2">2) bootstrap.yml</h3>
+
+除了 spring.application.name 之外外，其他配置与用户中心的 bootstrap.yml 相同。
+
+<h3 id="2.6.3">3) file-center.yml</h3>
+
+#### a) 数据库和 mq
+```
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://local.mysql.com:3306/cloud_file?useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: mysql
+  rabbitmq:
+    host: local.rabbitmq.com
+    port: 5672
+    username: cloud-dev
+    password: cloud-dev
+    virtual-host: /
+```
+
+#### b) 上传文件大小限制
+```
+http:
+  multipart:
+    max-file-size: 100MB
+    max-request-size: 100MB
+```
+
+#### c) 自定义配置-本地存储文件
+```
+file:
+  local:
+    path: D:/localFile
+    prefix: /statics
+    urlPrefix: http://api.gateway.com:8080/api-f${file.local.prefix}
+```
+
+* path 是上传文件存储根路径
+* prefix 是前缀
+* urlPrefix 是域名加前缀
+
+如 D:/localFile/aaa.png 用url访问就是 http://api.gateway.com:8080/api-f/statics/aaa.png
+
+#### d) 阿里云存储文件
+```
+  aliyun:
+    endpoint: xxx
+    accessKeyId: xxx
+    accessKeySecret: xxx
+    bucketName: xxx
+    domain: https://xxx
+```
+
+如要上传图片到阿里云，这里需要配置你的阿里云对象存储OSS相关配置，详细根据视频目录看下视频。
+
+<h3 id="2.6.4">4) 配置类</h3>
+
+- file-center
+  - sql
+    - cloud_file.sql
+  - src
+    - main
+      - java
+        - com.cloud.file
+          - config
+            - AliyunConfig.java
+            - ExceptionHandlerAdvice.java
+            - FileServiceFactory.java
+            - LocalFilePathConfig.java
+            - ResourceServerConfig.java
+            - SwaggerConfig.java
+
+#### a) 加载jar包外文件
+```
+/** 使系统加载jar包外的文件 */
+@Configuration
+public class LocalFilePathConfig {
+
+	/** 上传文件存储在本地的根路径  */
+	@Value("${file.local.path}")
+	private String localFilePath;
+
+	/**  url前缀  */
+	@Value("${file.local.prefix}")
+	public String localFilePrefix;
+
+	@Bean
+	public WebMvcConfigurer webMvcConfigurerAdapter() {
+		return new WebMvcConfigurer() {
+			/** 外部文件访问 */
+			@Override
+			public void addResourceHandlers(ResourceHandlerRegistry registry) {
+				registry.addResourceHandler(localFilePrefix + "/**")
+						.addResourceLocations(ResourceUtils.FILE_URL_PREFIX + localFilePath + File.separator);
+			}
+		};
+	}
+}
+```
+上传文件存储路径肯定是在jar包外部的，这里不像传统war包是解压成文件夹的，因此这里需要做个静态资源的映射处理。将url前缀和存储路径做了个映射。
+
+#### b) 资源服务器
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+	/**  url前缀  */
+	@Value("${file.local.prefix}")
+	public String localFilePrefix;
+
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable().exceptionHandling()
+				.authenticationEntryPoint(
+						(request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+				.and().authorizeRequests()
+				.antMatchers(PermitAllUrl.permitAllUrl("/files-anon/**", localFilePrefix + "/**")).permitAll() // 放开权限的url
+				.anyRequest().authenticated().and().httpBasic();
+	}
+}
+```
+这里要将静态资源下的路径放开权限。
