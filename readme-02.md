@@ -36,6 +36,11 @@
   - [2.8 日志组件 log-starter](#2.8)    
     - [1) spring.factories](#2.8.1)   
     - [2) 使用该组件](#2.8.2)   
+  - [2.9 日志中心](#2.9)   
+    - [1) log-center.yml](#2.9.1)   
+    - [2) 配置类](#2.9.2)   
+    - [3) 处理日志消息](#2.9.3)   
+    - [4) 日志存储mysql和elasticsearch切换](#2.9.4) 
 
 
 
@@ -1318,6 +1323,166 @@ public class LogAop {
 
 
 
+<h2 id="2.9">2.9 日志中心</h2>
+
+- log-center
+  - sql
+    - cloud_log.sql
+  - src
+    - main
+      - java
+        - .com.cloud.log
+          - config
+          - consumer
+          - controller
+          - dao
+          - service
+          - LogCenterApplication.java
+      - resources
+        - mybatis-mappers
+        - .gitignore
+        - bootstrap.yml
+    - test
+  - .gitignore
+  - log-center.iml
+  - pom.xml
+  - README.md
+
+bootstrap.yml 里 spring.application.name 为 log-center 其余跟用户中心的一样。
+
+
+<h3 id="2.9.1">1) log-center.yml</h3>
+
+主要是数据库、mq、mybatis的配置，elasticsearch不是必用的。
+```
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://local.mysql.com:3306/cloud_log?useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: mysql
+  rabbitmq:
+    host: local.rabbitmq.com
+    port: 5672
+    username: cloud-dev
+    password: cloud-dev
+    virtual-host: /
+    listener:
+      simple:
+        concurrency: 20
+        max-concurrency: 50
+mybatis:
+  type-aliases-package: com.cloud.model.log
+  mapper-locations: classpath:/mybatis-mappers/*
+  configuration:
+    mapUnderscoreToCamelCase: true
+elasticsearch:
+  clusterName: elasticsearch
+  clusterNodes: 127.0.0.1:9300
+```
+
+<h3 id="2.9.2">2) 配置类</h3>
+
+- log-center
+  - sql
+    - cloud_log.sql
+  - src
+    - main
+      - java
+        - .com.cloud.log
+          - config
+            - AsycTaskExecutorConfig.java
+            - ElasticSearchConfig.java
+            - RabbitmqConfig.java
+            - ResourceServerConfig.java
+            - SwaggerConfig.java
+
+#### a) 开启异步线程池
+```
+/**  线程池配置、启用异步 */
+@EnableAsync(proxyTargetClass = true)
+@Configuration
+public class AsycTaskExecutorConfig {
+
+	@Bean
+	public TaskExecutor taskExecutor() {
+		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+		taskExecutor.setCorePoolSize(50);
+		taskExecutor.setMaxPoolSize(100);
+
+		return taskExecutor;
+	}
+}
+```
+
+#### b) 声明队列
+```
+/** rabbitmq配置 */
+@Configuration
+public class RabbitmqConfig {
+
+	/**  声明队列 */
+	@Bean
+	public Queue logQueue() {
+		Queue queue = new Queue(LogQueue.LOG_QUEUE);
+		return queue;
+	}
+}
+```
+
+<h3 id="2.9.3">3) 处理日志消息</h3>
+
+```
+/** 从mq队列消费日志数据 */
+@Component
+@RabbitListener(queues = LogQueue.LOG_QUEUE) // 监听队列
+public class LogConsumer {
+
+	private static final Logger logger = LoggerFactory.getLogger(LogConsumer.class);
+
+	@Autowired
+	private LogService logService;
+
+	/**  处理消息
+	 * @param log
+	 */
+	@RabbitHandler
+	public void logHandler(Log log) {
+		try {
+			logService.save(log);
+		} catch (Exception e) {
+			logger.error("保存日志失败，日志：{}，异常：{}", log, e);
+		}
+	}
+}
+```
+从队列中处理消息，将日志存入数据库。
+
+<h3 id="2.9.4">4) 日志存储mysql和elasticsearch切换</h3>
+
+- log-center
+  - sql
+  - src
+    - main
+      - java
+        - .com.cloud.log
+          - config
+          - consumer
+          - controller
+          - dao
+          - service
+            - impl
+              - EsLogServiceImpl.java
+              - LogServiceImpl.java
+
+如想存储到 elasticsearch 的话，注释掉 LogServiceImpl 上的 @Primary 和 @Service 。
+
+```
+//@Primary
+//@Service
+public class LogServiceImpl implements LogService {
+```
+或者将 @Primary移到 EsLogServiceImpl 上面。
 
 
 
