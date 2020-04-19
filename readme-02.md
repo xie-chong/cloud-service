@@ -30,9 +30,31 @@
     - [2) bootstrap.yml](#2.6.2)   
     - [3) file-center.yml](#2.6.3)   
     - [4) 配置类](#2.6.4)   
-  - [2.7 文件中心](#2.7)    
+  - [2.7 网关](#2.7)    
     - [1) gateway-zuul.yml](#2.7.1)   
     - [1) 配置类](#2.7.2)   
+  - [2.8 日志组件 log-starter](#2.8)    
+    - [1) spring.factories](#2.8.1)   
+    - [2) 使用该组件](#2.8.2)   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1211,3 +1233,101 @@ public class ExceptionHandlerAdvice {
 	public Map<String, Object> feignException(FeignException exception, HttpServletResponse response) {
 ```
 这里主要处理FeignException，这个是feignclient调用时的异常，不处理的话将会抛出500服务端异常，这里只是将下游服务的原始http状态码还原。
+
+
+
+
+
+
+
+<h2 id="2.8">2.8 日志组件 log-starter</h2>
+
+- log-starter
+  - src
+    - main
+      - java
+        - com.cloud.log.autoconfigure
+          - LogAop.java
+          - LogAutoConfiguration.java
+          - LogMqClient.java
+      - resources
+        - META-INF
+          - spring.factories
+          - .gitignore
+  - .gitignore
+  - log-starter.iml
+  - pom.xml
+
+这里是模仿spring boot自动配置写的一个组件，就像spring boot里的各种starter，如
+```
+		<dependency>
+			<groupId>org.mybatis.spring.boot</groupId>
+			<artifactId>mybatis-spring-boot-starter</artifactId>
+		</dependency>
+```
+你只需要引入mybatis的starter，和数据源的配置，就可以用mybatis了。
+
+
+<h3 id="2.8.1">1) spring.factories</h3>
+
+- resources
+  - META-INF
+    - spring.factories
+
+这里配置自动配置的类。
+```
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.cloud.log.autoconfigure.LogAutoConfiguration,\
+com.cloud.log.autoconfigure.LogAop
+```
+
+<h3 id="2.8.2">2) 使用该组件</h3>
+
+我们这里的log-starter是依赖rabbitmq的，只需要引入
+```
+	<dependency>
+		<groupId>com.cloud</groupId>
+		<artifactId>log-starter</artifactId>
+		<version>${project.version}</version>
+	</dependency>
+```
+再配置上mq信息，如下的aop类即可生效，就实现了aop日志拦截，将log信息发送到mq队列。
+```
+/**
+ * aop实现日志
+ *
+ */
+@Aspect
+public class LogAop {
+
+    private static final Logger logger = LoggerFactory.getLogger(LogAop.class);
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
+
+    /**
+     * 环绕带注解 @LogAnnotation的方法做aop
+     */
+    @Around(value = "@annotation(com.cloud.model.log.LogAnnotation)")
+    public Object logSave(ProceedingJoinPoint joinPoint) throws Throwable {
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
