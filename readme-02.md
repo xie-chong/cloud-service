@@ -478,7 +478,7 @@ public class EnvironmentController {
 
 在user-center模块下的sql文件夹下cloud_user.sql里是用户中心的数据脚本，包含建表语句和初始化数据。
 
-<h3 id="2.4.3">2) bootstrap.yml</h3>
+<h3 id="2.4.2">2) bootstrap.yml</h3>
 
 ```
 spring:
@@ -715,7 +715,7 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 <h3 id="2.5.2">2) bootstrap.yml</h3>
 
-除了 spring.application.name 之外外，其他配置与用户中心的 bootstrap.yml 相同。
+除了 spring.application.name 之外，其他配置与用户中心的 bootstrap.yml 相同。
 
 <h3 id="2.5.3">3) oauth-center.yml</h3>
 
@@ -919,7 +919,7 @@ public class SessionConfig {
 
 <h3 id="2.6.2">2) bootstrap.yml</h3>
 
-除了 spring.application.name 之外外，其他配置与用户中心的 bootstrap.yml 相同。
+除了 spring.application.name 之外，其他配置与用户中心的 bootstrap.yml 相同。
 
 <h3 id="2.6.3">3) file-center.yml</h3>
 
