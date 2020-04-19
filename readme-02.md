@@ -30,7 +30,9 @@
     - [2) bootstrap.yml](#2.6.2)   
     - [3) file-center.yml](#2.6.3)   
     - [4) 配置类](#2.6.4)   
-
+  - [2.7 文件中心](#2.7)    
+    - [1) gateway-zuul.yml](#2.7.1)   
+    - [1) 配置类](#2.7.2)   
 
 
 
@@ -1044,3 +1046,168 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 }
 ```
 这里要将静态资源下的路径放开权限。
+
+
+
+
+
+
+
+
+<h2 id="2.7">2.7 网关</h2>
+
+- gateway-zuul
+  - src
+    - main
+      - java
+        - com.cloud.gateway
+          - config
+          - controller
+          - feign
+          - filter
+          - GatewayApplication.java
+      - resources
+        - .gitignore
+        - bootstrap.yml
+  - .gitignore
+  - gateway-zuul.iml
+  - pom.xml
+  - README.md
+
+bootstrap.yml 里 spring.application.name 为 gateway-zuul ，其余跟用户中心的一样。
+
+<h3 id="2.7.1">1) gateway-zuul.yml</h3>
+
+#### a) 路由规则
+```
+zuul:
+  ignored-services: '*'
+  sensitiveHeaders:
+  routes:
+    oauth:
+      path: /api-o/**
+      serviceId: oauth-center
+    api-u:
+      path: /api-u/**
+      serviceId: user-center
+    backend:
+      path: /api-b/**
+      serviceId: manage-backend
+    log:
+      path: /api-l/**
+      serviceId: log-center
+    file:
+      path: /api-f/**
+      serviceId: file-center
+    sms:
+      path: /api-n/**
+      serviceId: notification-center
+```
+
+**sensitiveHeaders** 过滤客户端附带的headers，如：   
+sensitiveHeaders: X-ABC   
+如果在发请求时带了X-ABC，那么X-ABC不会往下游服务传递。
+
+#### b) 自定义参数
+```
+cron:
+  black-ip: 0 0/5 * * * ?
+```
+这是个cron定时任务表达式，每5分钟执行一次。
+
+com.cloud.gateway.filter.BlackIPAccessFilter.java
+```
+	/**
+	 * 定时同步黑名单IP
+	 */
+	@Scheduled(cron = "${cron.black-ip}")
+	public void syncBlackIPList() {
+		try {
+			Set<String> list = backendClient.findAllBlackIPs(Collections.emptyMap());
+			blackIPs = list;
+		} catch (Exception e) {
+			// do nothing
+		}
+	}
+```
+
+<h3 id="2.7.2">2) 配置类</h3>
+
+- gateway-zuul
+  - src
+    - main
+      - java
+        - com.cloud.gateway
+          - config
+            - CrossDomainConfig.java
+            - ExceptionHandlerAdvice.java
+            - SecurityConfig.java
+            - SwaggerConfig.java
+
+
+#### a) 跨域配置
+```
+/**
+ * 跨域配置<br>
+ * 页面访问域名和后端接口地址的域名不一致时，会先发起一个OPTIONS的试探请求<br>
+ * 如果不设置跨域的话，js将无法正确访问接口，域名一致的话，不存在这个问题
+ *
+ */
+@Configuration
+public class CrossDomainConfig {
+
+    /**
+     * 跨域支持
+     *
+     * @return
+     */
+    @Bean
+    public CorsFilter corsFilter() {
+        final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        final CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true); // 允许cookies跨域
+        config.addAllowedOrigin("*");// #允许向该服务器提交请求的URI，*表示全部允许
+        config.addAllowedHeader("*");// #允许访问的头信息,*表示全部
+        config.setMaxAge(18000L);// 预检请求的缓存时间（秒），即在这个时间段里，对于相同的跨域请求不会再预检了
+        config.addAllowedMethod("*");// 允许提交请求的方法，*表示全部允许
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
+    }
+
+    //两种方式任选其一即可
+//    @Bean
+//    public WebMvcConfigurer corsConfigurer() {
+//        return new WebMvcConfigurer() {
+//            @Override
+//            public void addCorsMappings(CorsRegistry registry) {
+//                registry.addMapping("/**") // 拦截所有权请求
+//                        .allowedMethods("*") // 允许提交请求的方法，*表示全部允许
+//                        .allowedOrigins("*") // #允许向该服务器提交请求的URI，*表示全部允许
+//                        .allowCredentials(true) // 允许cookies跨域
+//                        .allowedHeaders("*") // #允许访问的头信息,*表示全部
+//                        .maxAge(18000L); // 预检请求的缓存时间（秒），即在这个时间段里，对于相同的跨域请求不会再预检了
+//            }
+//        };
+//    }
+
+}
+```
+只需要在网关层配置，别的微服务不需要配置跨域。
+
+#### b) 异常处理
+```
+@Slf4j
+@RestControllerAdvice
+public class ExceptionHandlerAdvice {
+
+	/**
+	 * feignClient调用异常，将服务的异常和http状态码解析
+	 *
+	 * @param exception
+	 * @param response
+	 * @return
+	 */
+	@ExceptionHandler({ FeignException.class })
+	public Map<String, Object> feignException(FeignException exception, HttpServletResponse response) {
+```
+这里主要处理FeignException，这个是feignclient调用时的异常，不处理的话将会抛出500服务端异常，这里只是将下游服务的原始http状态码还原。
