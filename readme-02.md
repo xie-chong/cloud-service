@@ -41,7 +41,7 @@
     - [2) 配置类](#2.9.2)   
     - [3) 处理日志消息](#2.9.3)   
     - [4) 日志存储 mysql 和 elasticsearch 切换](#2.9.4) 
-  - [2.10 日志中心](#2.9)   
+  - [2.10 后台管理系统](#2.9)   
     - [1) manage-backend.yml](#2.10.1)   
     - [2) 消息处理](#2.10.2)   
     - [3) 静态资源](#2.10.3)   
@@ -928,15 +928,15 @@ public class SessionConfig {
     - main
       - java
         - com.cloud.file
-          - config
-          - controller
-          - dao
-          - model
-          - service
-          - utils
+          - config >
+          - controller >
+          - dao >
+          - model >
+          - service >
+          - utils >
           - FileCenterApplication.java
       - resources
-        - mybatis-mappers
+        - mybatis-mappers >
         - .gitignore
         - bootstrap.yml
   - .gitignore
@@ -1334,18 +1334,18 @@ public class LogAop {
   - src
     - main
       - java
-        - .com.cloud.log
-          - config
-          - consumer
-          - controller
-          - dao
-          - service
+        - com.cloud.log
+          - config >
+          - consumer >
+          - controller >
+          - dao >
+          - service >
           - LogCenterApplication.java
       - resources
-        - mybatis-mappers
+        - mybatis-mappers >
         - .gitignore
         - bootstrap.yml
-    - test
+    - test >
   - .gitignore
   - log-center.iml
   - pom.xml
@@ -1392,7 +1392,7 @@ elasticsearch:
   - src
     - main
       - java
-        - .com.cloud.log
+        - com.cloud.log
           - config
             - AsycTaskExecutorConfig.java
             - ElasticSearchConfig.java
@@ -1464,15 +1464,15 @@ public class LogConsumer {
 <h3 id="2.9.4">4) 日志存储 mysql 和 elasticsearch 切换</h3>
 
 - log-center
-  - sql
+  - sql >
   - src
     - main
       - java
-        - .com.cloud.log
-          - config
-          - consumer
-          - controller
-          - dao
+        - com.cloud.log
+          - config >
+          - consumer >
+          - controller >
+          - dao >
           - service
             - impl
               - EsLogServiceImpl.java
