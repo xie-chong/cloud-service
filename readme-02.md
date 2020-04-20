@@ -46,7 +46,8 @@
     - [2) 消息处理](#2.10.2)   
     - [3) 静态资源](#2.10.3)   
   - [2.11 监控中心](#2.11)   
-
+  - [2.12 后台管理系统](#2.12)   
+    - [1) notification-center.yml](#2.12.1)   
 
 
 
@@ -1648,6 +1649,68 @@ var domainName = "http://api.gateway.com:8080";
   - README.md
 
 bootstrap.yml 里指定了固定的端口号9001,访问 http://localhost:9001 即可查看监控界面。
+
+
+
+
+
+
+
+
+
+<h2 id="2.12">2.12 通知中心</h2>
+
+- notification-center
+  - sql
+    - cloud_notification.sql
+  - src
+    - main
+    - java
+      - com.cloud.notification
+        - config >
+        - controller >
+        - dao >
+        - model >
+        - service >
+        - utils >
+        - NotificationCenterApplication.java
+    - resources
+      - mybatis-mappers >
+      - .gitignore
+      - bootstrap.yml
+    - test >
+  - .gitignore
+  - notification-center.iml
+  - pom.xml
+  - README.md
+
+bootstrap.yml 里 spring.application.name 为 config-center 其余跟用户中心的一样。
+
+<h3 id="2.12.1">1) notification-center.yml</h3>
+
+数据库、mq、redis都和别的配置相似。
+
+主要说下阿里云短信配置，这些参数需要从阿里云管理控制台自己创建。
+```
+aliyun:
+  accessKeyId: xxx
+  accessKeySecret: xxx
+  sign:
+    name1: xxx
+  template:
+    code1: xxx
+```
+
+这里是短信过期时间15分钟，和一天能发送的验证码个数上限。
+```
+sms:
+  expire-minute: 15
+  day-count: 30
+```
+
+
+
+
 
 
 
