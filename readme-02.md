@@ -1684,7 +1684,7 @@ bootstrap.yml 里指定了固定的端口号9001,访问 http://localhost:9001 �
   - pom.xml
   - README.md
 
-bootstrap.yml 里 spring.application.name 为 config-center 其余跟用户中心的一样。
+bootstrap.yml 里 spring.application.name 为 notification-center 其余跟用户中心的一样。
 
 <h3 id="2.12.1">1) notification-center.yml</h3>
 
