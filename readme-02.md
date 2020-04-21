@@ -48,32 +48,11 @@
   - [2.11 监控中心](#2.11)   
   - [2.12 后台管理系统](#2.12)   
     - [1) notification-center.yml](#2.12.1)   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  - [2.13 Swagger配置](#2.13)     
+  - [2.14 user-info-uri](#2.14)   
+  - [2.15 commons模块](#2.15)   
+    - [1) PermitAllUrl.java](#2.15.1)   
+    - [2) AppUserUtil.java](#2.15.2)   
 ---
 ---
 ---
@@ -1714,7 +1693,175 @@ sms:
 
 
 
+<h2 id="2.13">2.13 Swagger配置</h2>
 
+除注册中心、配置中心、监控中心不提供对外接口，别的项目都有 SwaggerConfig.java 这个类。
+
+```
+/**
+ * swagger文档
+ *
+ */
+@Configuration
+@EnableSwagger2
+public class SwaggerConfig {
+
+	@Bean
+	public Docket docket() {
+		return new Docket(DocumentationType.SWAGGER_2).groupName("用户中心swagger接口文档")
+				.apiInfo(new ApiInfoBuilder().title("用户中心swagger接口文档")
+						.contact(new Contact("小威老师", "", "xiaoweijiagou@163.com")).version("1.0").build())
+				.select().paths(PathSelectors.any()).build();
+	}
+}
+```
+
+
+
+
+
+
+
+
+
+<h2 id="2.14">2.14 user-info-uri</h2>
+
+在配置中心config-center许多微服务的配置里都有从认证中心获取用户信息。
+```
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://local.gateway.com:8080/api-o/user-me
+      prefer-token-info: false
+```
+
+对应 oauth-center 里的接口   
+oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Controller.java
+```
+@Slf4j
+@RestController
+@RequestMapping
+public class OAuth2Controller {
+
+    /**
+     * 当前登陆用户信息<br>
+     * security获取当前登录用户的方法是SecurityContextHolder.getContext().getAuthentication()<br>
+     * 返回值是接口org.springframework.security.core.Authentication，又继承了Principal<br>
+     * 这里的实现类是org.springframework.security.oauth2.provider.OAuth2Authentication<br>
+     *
+     * 因此这只是一种写法，下面注释掉的三个方法也都一样，这四个方法任选其一即可，也只能选一个，毕竟uri相同，否则启动报错<br>
+     * 2018.05.23改为默认用这个方法，好理解一点
+     *
+     * @return
+     */
+    @GetMapping("/user-me")
+    public Authentication principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.debug("user-me:{}", authentication.getName());
+        return authentication;
+    }
+
+//	@GetMapping("/user-me")
+//	public Principal principal(Principal principal) {
+//		log.debug("user-me:{}", principal.getName());
+//		return principal;
+//	}
+//
+//	@GetMapping("/user-me")
+//	public Authentication principal(Authentication authentication) {
+//		log.debug("user-me:{}", authentication.getName());
+//		return authentication;
+//	}
+//
+//	@GetMapping("/user-me")
+//	public OAuth2Authentication principal(OAuth2Authentication authentication) {
+//		log.debug("user-me:{}", authentication.getName());
+//		return authentication;
+//	}
+
+    //	@Autowired
+//	private TokenStore tokenStore;
+//
+//	/**
+//	 * 移除access_token和refresh_token
+//	 *
+//	 * @param access_token
+//	 */
+//	@DeleteMapping(value = "/remove_token", params = "access_token")
+//	public void removeToken(Principal principal, String access_token) {
+//		OAuth2AccessToken accessToken = tokenStore.readAccessToken(access_token);
+//		if (accessToken != null) {
+//			// 移除access_token
+//			tokenStore.removeAccessToken(accessToken);
+//
+//			// 移除refresh_token
+//			if (accessToken.getRefreshToken() != null) {
+//				tokenStore.removeRefreshToken(accessToken.getRefreshToken());
+//			}
+//
+//			saveLogoutLog(principal.getName());
+//		}
+//	}
+
+// ......
+```
+
+**注解 @EnableResourceServer **
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+```
+
+因为加了注解 **@EnableResourceServer** 的各微服务都是资源服务器，是需要校验用户权限的，通过 user-info-uri 可以从认证中心获取到用户的信息和权限，感兴趣的可以看下
+org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter
+
+
+
+
+
+
+
+<h2 id="2.15">2.15 commons模块</h2>
+
+- commons
+  - src
+    - main
+      - java
+        - com.cloud.common
+          - constants
+            - PermitAllUrl.java
+          - utils
+            - AppUserUtil.java
+            - PageUtil.java
+            - PhoneUtil.java
+      - resources
+        - .gitignore
+  - .gitignore
+  - commons.iml
+  - pom.xml
+
+<h3 id="2.15.1">1) PermitAllUrl.java</h3>
+
+com.cloud.common.constants.PermitAllUrl.java 主要定义了一些不需要权限拦截的url
+```
+    /** 监控中心和swagger需要访问的url */
+    private static final String[] ENDPOINTS = {"/actuator/health", "/actuator/env", "/actuator/metrics/**", "/actuator/trace", "/actuator/dump",
+            "/actuator/jolokia", "/actuator/info", "/actuator/logfile", "/actuator/refresh", "/actuator/flyway", "/actuator/liquibase",
+            "/actuator/heapdump", "/actuator/loggers", "/actuator/auditevents", "/actuator/env/PID", "/actuator/jolokia/**",
+            "/v2/api-docs/**", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**"};
+```
+
+下面这几个是swagger文档需要放开的url，其余是监控中心需要放开的url
+```
+"/v2/api-docs/**", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**"
+```
+
+<h3 id="2.15.2">2) AppUserUtil.java</h3>
+
+com.cloud.common.utils.AppUserUtil.java 是获取当前登录用户的工具类
 
 
 
