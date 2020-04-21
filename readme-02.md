@@ -62,20 +62,20 @@
 
 + cloud-service
    + .idea
-   + api-model
-   + commons
-   + config-center
-   + file-center
-   + gateway-zuul
-   + log-center
-   + log-starter
-   + manage-backend
-   + monitor-center
-   + notification-center
-   + oauth-center
-   + register-center
-   + user-center
-   + 文档
+   + api-model >
+   + commons >
+   + config-center >
+   + file-center >
+   + gateway-zuul >
+   + log-center >
+   + log-starter >
+   + manage-backend >
+   + monitor-center >
+   + notification-center >
+   + oauth-center >
+   + register-center >
+   + user-center >
+   + 文档 >
    + .gitignore
    + cloud-service.iml
    + pom.xml
@@ -317,9 +317,9 @@ native:
 
 - src/main/resources
   - configs
-    - dev
-    - production
-    - test
+    - dev >
+    - production >
+    - test >
 
 生产版本我们可以在启动服务```java -jar xxx.jar```时，指定运行环境参数（命令行优先）。
 
@@ -467,6 +467,10 @@ public class EnvironmentController {
 ```
 
 
+
+
+
+
 <h2 id="2.4">2.4 用户中心</h2>
 
 - user-center
@@ -475,12 +479,16 @@ public class EnvironmentController {
     - main
       - java
         - com.cloud.user
+          - config >
+          - controller >
+          - dao >
+          - service >
           - UserCenterApplication.java
       - resources
-        - mybatis-mappers
+        - mybatis-mappers >
         - .gitignore
         - bootstrap.yml
-    - test
+    - test >
   - .gitignore
   - pom.xml
   - README.md
@@ -707,10 +715,10 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
     - main
       - java
         - com.cloud.oauth
-          - config
-          - controller
-          - feign
-          - service.impl
+          - config >
+          - controller >
+          - feign >
+          - service >
           - OAuthCenterApplication.java
       - resources
         - .gitignore
@@ -1071,10 +1079,10 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
     - main
       - java
         - com.cloud.gateway
-          - config
-          - controller
-          - feign
-          - filter
+          - config >
+          - controller >
+          - feign >
+          - filter >
           - GatewayApplication.java
       - resources
         - .gitignore
