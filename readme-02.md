@@ -1807,6 +1807,7 @@ public class OAuth2Controller {
 ```
 
 **注解 @EnableResourceServer **
+
 ```
 /** 资源服务配置 */
 @EnableResourceServer
