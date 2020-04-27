@@ -45,3 +45,7 @@ public class BCryptPasswordEncoder implements PasswordEncoder {
         appUserService.updatePassword(id, null, newPassword);
     }
 ```
+
+## 3
+
+给用户设置角色 ，采用先删除老角色，再插入新角色。
