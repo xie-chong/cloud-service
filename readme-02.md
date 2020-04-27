@@ -689,7 +689,7 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 ```
 
 * ```@EnableResourceServer```将我们的项目作为资源服务器
-* ```prePostEnabled = true```是启动权限注解支持
+* ```prePostEnabled = true```是启动权限注解支持（开启基于方法的安全认证机制，也就是说在web层的controller启用注解机制的安全确认，这样使用的 @PreAuthorize(“hasAuthority(‘admin’)”)才会生效。）
 * ```.antMatchers(PermitAllUrl.permitAllUrl("/users-anon/**", "/wechat/**")).permitAll()```这里符合规则的url将不做权限拦截
 
 
