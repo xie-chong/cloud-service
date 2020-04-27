@@ -49,3 +49,91 @@ public class BCryptPasswordEncoder implements PasswordEncoder {
 ## 3
 
 给用户设置角色 ，采用先删除老角色，再插入新角色。
+
+
+## 4
+```
+/**
+	 * 给角色设置权限
+	 *
+	 * @param roleId
+	 * @param permissionIds
+	 */
+	@Transactional
+	@Override
+	public void setPermissionToRole(Long roleId, Set<Long> permissionIds) {
+		SysRole sysRole = sysRoleDao.findById(roleId);
+		if (sysRole == null) {
+			throw new IllegalArgumentException("角色不存在");
+		}
+
+		// 查出角色对应的old权限
+		Set<Long> oldPermissionIds = rolePermissionDao.findPermissionsByRoleIds(Sets.newHashSet(roleId)).stream()
+				.map(p -> p.getId()).collect(Collectors.toSet());
+
+		// 需要添加的权限
+		Collection<Long> addPermissionIds = org.apache.commons.collections4.CollectionUtils.subtract(permissionIds,
+				oldPermissionIds);
+		if (!CollectionUtils.isEmpty(addPermissionIds)) {
+			addPermissionIds.forEach(permissionId -> {
+				rolePermissionDao.saveRolePermission(roleId, permissionId);
+			});
+		}
+		// 需要移除的权限
+		Collection<Long> deletePermissionIds = org.apache.commons.collections4.CollectionUtils
+				.subtract(oldPermissionIds, permissionIds);
+		if (!CollectionUtils.isEmpty(deletePermissionIds)) {
+			deletePermissionIds.forEach(permissionId -> {
+				rolePermissionDao.deleteRolePermission(roleId, permissionId);
+			});
+		}
+
+		log.info("给角色id：{}，分配权限：{}", roleId, permissionIds);
+	}
+```
+
+其逻辑与把全部权限删除，再插入新的权限效果一样。
+
+demo:
+```
+	public static void main(String[] args) {
+		Set<String> oldP = new HashSet();
+		oldP.add("a");
+		oldP.add("b");
+		oldP.add("c");
+
+		Set<String> newP = new HashSet();
+		newP.add("c");
+		newP.add("d");
+		newP.add("e");
+
+		ArrayList<String> s1 = (ArrayList<String>) org.apache.commons.collections4.CollectionUtils.subtract(newP,oldP);
+
+		ArrayList<String> s2 = (ArrayList<String>) org.apache.commons.collections4.CollectionUtils.subtract(oldP,newP);
+
+		System.out.println(oldP);
+		System.out.println(newP);
+		System.out.println(s1);
+		System.out.println(s2);
+
+	}/*
+	out:
+	[a, b, c]
+	[c, d, e]
+	[d, e]
+	[a, b]	
+	*/
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
