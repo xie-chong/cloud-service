@@ -131,7 +131,17 @@ demo:
 
 当系统支持多种类型登陆时（手机号、用户名、微信号），我们可以创建一张用户凭证表，以便在同一个用户id下支持多种登陆类型。
 
+table:user_credentials
 
+| username | type | userid |
+| :---- | :---- | :---- |
+| admin | USERNAME | 1 |
+| 13247610000 | USERNAME | 1 |
+| superadmin | USERNAME | 2 |
+
+```
+select u.* from app_user u inner join user_credentials c on c.userId = u.id where c.username = '13247610000';
+```
 
 
 
