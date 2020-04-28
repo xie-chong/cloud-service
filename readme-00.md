@@ -147,7 +147,7 @@ select u.* from app_user u inner join user_credentials c on c.userId = u.id wher
 
 除了认证中心 oauth-center 需要配置两个地方（ResourceServerConfig.java、SecurityConfig.java），其他服务只需要配置一个地方（ResourceServerConfig.java）。
 
-放开权限的url可以不带access-token，如果携带则需要保证其正确性，否则会401错误。
+放开权限的url可以不带access-token，如果携带则需要保证其正确性，否则会提示401错误。
 ```
 /**  资源服务配置 */
 @EnableResourceServer
