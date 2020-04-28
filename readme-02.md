@@ -482,6 +482,7 @@ public class EnvironmentController {
           - config >
           - controller >
           - dao >
+          - feign >
           - service >
           - UserCenterApplication.java
       - resources
@@ -718,7 +719,7 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
           - config >
           - controller >
           - feign >
-          - service >
+          - service.impl >
           - OAuthCenterApplication.java
       - resources
         - .gitignore
