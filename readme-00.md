@@ -204,7 +204,7 @@ Ribbon进行客户端负载均衡的Client并不是在服务启动的时候就�
 因此我们可以通过设置，**开启Ribbon的饥饿加载模式**
 
 
-## 05.2 feignClient简单介绍
+## 05.2 FeignClient简单介绍
 
 cloud-service\oauth-center\src\main\java\com\cloud\oauth\OAuthCenterApplication.java
 ```
