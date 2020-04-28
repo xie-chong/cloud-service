@@ -204,3 +204,91 @@ Ribbon进行客户端负载均衡的Client并不是在服务启动的时候就�
 因此我们可以通过设置，**开启Ribbon的饥饿加载模式**
 
 
+## 05.2 feignClient简单介绍
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\OAuthCenterApplication.java
+```
+/** 认证中心 */
+@EnableFeignClients
+@EnableDiscoveryClient
+@SpringBootApplication
+public class OAuthCenterApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(OAuthCenterApplication.class, args);
+	}
+}
+```
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\feign\UserClient.java
+```
+@FeignClient("user-center")//该参数为对应的 spring.application.name: user-center
+public interface UserClient {
+
+    @GetMapping(value = "/users-anon/internal", params = "username")
+    LoginAppUser findByUsername(@RequestParam("username") String username);
+
+    @GetMapping("/wechat/login-check")
+    public void wechatLoginCheck(@RequestParam("tempCode") String tempCode, @RequestParam("openid") String openid);
+}
+```
+
+cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
+```
+@Slf4j
+@RestController
+public class UserController {
+
+    // ......
+
+    @GetMapping(value = "/users-anon/internal", params = "username")
+    public LoginAppUser findByUsername(String username) {
+        return appUserService.findByUsername(username);
+    }
+
+    // ......
+}
+```
+
+UserClient.java中的请求和UserController.java对应保持一致（类似MVC），返回类型可以不相同，但 @FeignClient 中的请求参数必须要有注解 @RequestParam。
+
+若包含@PathVariable，则其属性名不能为空，否则会报错
+```
+    // 错误
+//    @PreAuthorize("hasAuthority('back:user:query')")
+//    @GetMapping("/users/{id}")
+//    public AppUser findUserById(@PathVariable Long id) {
+//        return appUserService.findById(id);
+//    }
+
+    @PreAuthorize("hasAuthority('back:user:query')")
+    @GetMapping("/users/{id}")
+    public AppUser findUserById(@PathVariable("id") Long id) {
+        return appUserService.findById(id);
+    }
+```
+
+**使用**
+```
+@FeignClient("user-center")
+public interface UserClient {
+```
+UserClient.java 可以作为一个javaBean来注入使用，调用其方法就可以把请求发送到对应的服务。就避免我们自己主动发起 RESTFUL 请求。
+```
+@Slf4j
+@Service("userDetailsService")
+public class UserDetailServiceImpl implements UserDetailsService {
+
+    @Autowired
+    private UserClient userClient;
+	// ......
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // 为了支持多类型登录，这里username后面拼装上登录类型,如username|type
+        String[] params = username.split("\\|");
+        username = params[0];// 真正的用户名
+
+        LoginAppUser loginAppUser = userClient.findByUsername(username);
+
+// ......
+```
