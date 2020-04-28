@@ -143,7 +143,47 @@ table:user_credentials
 select u.* from app_user u inner join user_credentials c on c.userId = u.id where c.username = '13247610000';
 ```
 
+## 04.8 放开某url的权限
 
+除了认证中心 oauth-center 需要配置两个地方（ResourceServerConfig.java、SecurityConfig.java），其他服务只需要配置一个地方（ResourceServerConfig.java）。
+
+放开权限的url可以不带access-token，如果携带则需要保证其正确性，否则会401错误。
+```
+/**  资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+// ......
+.antMatchers(PermitAllUrl.permitAllUrl("/users-anon/**", "/wechat/**")).permitAll() // 放开权限的url
+
+// ......
+}
+```
+
+```
+/** spring security配置 */
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+// ......
+	/**
+	 * http安全配置
+	 * @param http
+	 *            http安全对象
+	 * @throws Exception
+	 *             http安全异常信息
+	 */
+	@Override
+	protected void configure(HttpSecurity http) throws Exception {
+		http.authorizeRequests()
+				.antMatchers(PermitAllUrl.permitAllUrl()).permitAll() // 放开权限的url
+				.anyRequest().authenticated().and()
+				.httpBasic().and().csrf().disable();
+	}
+}
+```
 
 
 
