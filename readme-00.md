@@ -187,5 +187,20 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 
 
+## 05.1 认证中心代码结构
+
+cloud-service\config-center\src\main\resources\configs\dev\oauth-center.yml中
+```
+ribbon:
+  eager-load:
+    enabled: true  # 开启Ribbon的饥饿加载模式
+    clients: user-center  # 指定需要饥饿加载的服务名
+```
+* 该配置为 **true** 时 oauth-center 启动时从注册中心获取 user-center 的IP和port
+* 该配置为 **false** 时 oauth-center 第一次调用 user-center 时获取 user-center 的IP和port
+
+Ribbon进行客户端负载均衡的Client并不是在服务启动的时候就初始化好的，而是在调用的时候才会去创建相应的Client，所以第一次调用的耗时不仅仅包含发送HTTP请求的时间，还包含了创建RibbonClient的时间，这样一来如果创建时间速度较慢，同时设置的超时时间又比较短的话，很容易就会出现在服务都成功启动的时候第一次访问会有报错的情况发生,但是之后又恢复正常访问。
+
+因此我们可以通过设置，**开启Ribbon的饥饿加载模式**
 
 
