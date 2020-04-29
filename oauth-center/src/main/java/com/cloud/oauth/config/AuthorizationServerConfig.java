@@ -45,9 +45,9 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
      * @see SecurityConfig 的authenticationManagerBean()
      */
     @Autowired
-    private AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager;// 认证管理器
     @Autowired
-    private RedisConnectionFactory redisConnectionFactory;
+    private RedisConnectionFactory redisConnectionFactory;// redis连接
     /**
      * 使用jwt或者redis<br>
      * 默认redis
@@ -82,8 +82,8 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 
     @Override
     public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
-        endpoints.authenticationManager(this.authenticationManager);
-        endpoints.tokenStore(tokenStore());
+        endpoints.authenticationManager(this.authenticationManager);// 配置认证管理器
+        endpoints.tokenStore(tokenStore());// 配置token的存储
         // 授权码模式下，code存储
 //		endpoints.authorizationCodeServices(new JdbcAuthorizationCodeServices(dataSource));
         endpoints.authorizationCodeServices(redisAuthorizationCodeServices);
