@@ -368,9 +368,9 @@ wechat:
 
 **注意**：由于redis、mysql、rabbitmq可能不在同一台机器，记得检查hosts文件中的ip映射
 
-[xie-chong-redis](interview-learn/learn-go/NOSQL/redis-01.md)
+[xie-chong-redis](https://github.com/xie-chong/interview-learn/blob/master/learn-go/NOSQL/redis-01.md#2.1)
 
-[xie-chong-RabbitMQ](interview-learn/learn-go/Message-Queue/RabbitMQ/readme.md)
+[xie-chong-RabbitMQ](https://github.com/xie-chong/interview-learn/blob/master/learn-go/Message-Queue/RabbitMQ/readme.md#01)
 
 ```
 # xie-chong-redis
