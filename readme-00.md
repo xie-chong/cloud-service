@@ -420,3 +420,116 @@ cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Contro
         }
     }
 ```
+
+
+
+## 05.4 登陆和鉴权
+
+org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
+```
+@FrameworkEndpoint
+public class TokenEndpoint extends AbstractEndpoint {
+// ......
+
+    @RequestMapping(
+        value = {"/oauth/token"},
+        method = {RequestMethod.GET}
+    )
+    public ResponseEntity<OAuth2AccessToken> getAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+        if (!this.allowedRequestMethods.contains(HttpMethod.GET)) {
+            throw new HttpRequestMethodNotSupportedException("GET");
+        } else {
+            return this.postAccessToken(principal, parameters);
+        }
+    }
+
+    @RequestMapping(
+        value = {"/oauth/token"},
+        method = {RequestMethod.POST}
+    )
+    public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+// ......
+```
+
+其中 OAuth2AccessToken 用户名密码模式的登陆即发起post请求。
+
+
+
+
+**test**
+
+1. 修改 bootstrap.yml 里配置的端口为固定值 user-center 7777， oauth-center 8888
+2. 修改请求地址 security.oauth2
+
+cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
+```
+security:
+  oauth2:
+    resource:
+      # user-info-uri: http://local.gateway.com:8080/api-o/user-me
+	  # 为了演示，直接配置成认证中心的地址
+	  user-info-uri: http://localhost:8888/user-me
+      prefer-token-info: false
+```
+**对应**
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Controller.java
+```
+@Slf4j
+@RestController
+@RequestMapping
+public class OAuth2Controller {
+
+    /**
+     * 当前登陆用户信息<br>
+     * <p>
+     * security获取当前登录用户的方法是SecurityContextHolder.getContext().getAuthentication()<br>
+     * 返回值是接口org.springframework.security.core.Authentication，又继承了Principal<br>
+     * 这里的实现类是org.springframework.security.oauth2.provider.OAuth2Authentication<br>
+     * <p>
+     * 因此这只是一种写法，下面注释掉的三个方法也都一样，这四个方法任选其一即可，也只能选一个，毕竟uri相同，否则启动报错<br>
+     * 2018.05.23改为默认用这个方法，好理解一点
+     *
+     * @return
+     */
+    @GetMapping("/user-me")
+    public Authentication principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.debug("user-me:{}", authentication.getName());
+        return authentication;
+    }
+```
+3. 启动 register-center、config-center、oauth-center、user-center
+
+| Application | AMis | AvailablityZones | Status|
+| :---- | :---- | :---- | :---- |
+| register-center | n/a(1) | (1) | UP(1) xxx |
+| config-center | n/a(1) | (1) | UP(1) xxx |
+| oauth-center | n/a(1) | (1) | UP(1) xxx |
+| user-center | n/a(1) | (1) | UP(1) xxx |
+
+4. 真正的登陆入口 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
+```
+    @RequestMapping(
+        value = {"/oauth/token"},
+        method = {RequestMethod.POST}
+    )
+    public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+```
+可以使用POST请求来测试
+
+REQUEST：
+http://localhost:8888/oauth/token?grant_type=password&client_id=system&client_secret=system&scope=app&username=admin&password=admin
+
+参数对应表```select * from oauth_client_details;```
+
+RESPONSE:
+```
+{
+    "access_token": "0cf23b5f-912f-46c4-9fd0-5402398b0f7f",
+    "token_type": "bearer",
+    "refresh_token": "d33f351a-2eae-419f-a674-732209d75834",
+    "expires_in": 28799,
+    "scope": "app"
+}
+```
+
