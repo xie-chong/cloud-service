@@ -368,6 +368,36 @@ wechat:
 
 **注意**：由于redis、mysql、rabbitmq可能不在同一台机器，记得检查hosts文件中的ip映射
 
+[xie-chong-redis](https://github.com/xie-chong/interview-learn/blob/master/learn-go/NOSQL/redis-01.md#2.1)
+
+[xie-chong-RabbitMQ](https://github.com/xie-chong/interview-learn/blob/master/learn-go/Message-Queue/RabbitMQ/readme.md#01)
+
+```
+# xie-chong-redis
+# 配置文件路径
+/opt/redis-5.0.7/redis.conf
+# redis安装路径
+/usr/local/redis/5.0.7/bin
+# 启动服务
+./redis-server /opt/redis-5.0.7/redis.conf
+# 开启命令行
+./redis-cli
+# 关闭
+单实例关闭：redis-cli shutdown
+
+多实例关闭，指定端口关闭:redis-cli -p 6379 shutdown
+```
+
+```
+# xie-chong-RabbitMQ
+# 安装路径
+cd /usr/lib/rabbitmq
+# 启动服务
+/bin/systemctl start rabbitmq-server.service
+查看服务状态
+/bin/systemctl status rabbitmq-server.service
+```
+
 1. 第一步启动注册中心  RegisterCenterApplication.java
 
 2. 第二步启动配置中心  ConfigCenterApplication.java

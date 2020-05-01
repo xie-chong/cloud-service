@@ -292,3 +292,131 @@ public class UserDetailServiceImpl implements UserDetailsService {
 
 // ......
 ```
+
+## 05.3 认证中心配置类和接口
+
+### 认证中心 oauth-center 是一个授权服务器
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\AuthorizationServerConfig.java
+
+* 注解 @EnableAuthorizationServer
+* 继承 AuthorizationServerConfigurerAdapter
+
+```
+/** 授权服务器配置 */
+@Configuration
+@EnableAuthorizationServer
+public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {
+```
+
+### 认证中心 oauth-center 是一个资源服务器
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\ResourceServerConfig.java
+
+```
+/**
+ * 资源服务配置<br>
+ *
+ * 注解@EnableResourceServer帮我们加入了org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter<br>
+ * 该filter帮我们从request里解析出access_token<br>
+ * 并通过org.springframework.security.oauth2.provider.token.DefaultTokenServices根据access_token和认证服务器配置里的TokenStore从redis或者jwt里解析出用户
+ *
+ * 注意认证中心的@EnableResourceServer和别的微服务里的@EnableResourceServer有些不同<br>
+ * 别的微服务是通过org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices来获取用户的
+ *
+ *
+ */
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+```
+
+### 用户校验
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\SecurityConfig.java
+
+### 开启session共享
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\SessionConfig.java
+
+引入依赖，借助redis来实现session共享（注意不能省略注解 @EnableRedisHttpSession），当请求过来，系统会自动把session存储到redis。
+
+```
+		<dependency>
+			<groupId>org.springframework.session</groupId>
+			<artifactId>spring-session-data-redis</artifactId>
+		</dependency>
+```
+
+```
+/** 开启session共享 */
+@EnableRedisHttpSession
+public class SessionConfig {
+
+}
+```
+
+### 获取登陆用户
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Controller.java
+
+```
+@Slf4j
+@RestController
+@RequestMapping
+public class OAuth2Controller {
+
+    /**
+     * 当前登陆用户信息<br>
+     * <p>
+     * security获取当前登录用户的方法是SecurityContextHolder.getContext().getAuthentication()<br>
+     * 返回值是接口org.springframework.security.core.Authentication，又继承了Principal<br>
+     * 这里的实现类是org.springframework.security.oauth2.provider.OAuth2Authentication<br>
+     * <p>
+     * 因此这只是一种写法，下面注释掉的三个方法也都一样，这四个方法任选其一即可，也只能选一个，毕竟uri相同，否则启动报错<br>
+     * 2018.05.23改为默认用这个方法，好理解一点
+     *
+     * @return
+     */
+    @GetMapping("/user-me")
+    public Authentication principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.debug("user-me:{}", authentication.getName());
+        return authentication;
+    }
+// ......
+```
+
+与cloud-service\config-center\src\main\resources\configs\dev\user-center.yml对应
+```
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://local.gateway.com:8080/api-o/user-me
+      prefer-token-info: false
+```
+
+### 用户退出
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Controller.java
+
+```
+ @Autowired
+    private ConsumerTokenServices tokenServices;
+
+    /**
+     * 注销登陆/退出
+     * 移除access_token和refresh_token<br>
+     * 用ConsumerTokenServices，该接口的实现类DefaultTokenServices已有相关实现
+     *
+     * @param access_token
+     */
+    @DeleteMapping(value = "/remove_token", params = "access_token")
+    public void removeToken(String access_token) {
+        boolean flag = tokenServices.revokeToken(access_token);
+        if (flag) {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            saveLogoutLog(authentication.getName());
+        }
+    }
+```
