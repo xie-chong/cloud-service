@@ -46,10 +46,10 @@
 spring:
   application:
     name: register-center
-    security:
-      user:
-        name: xiaowei
-        password: xiaoweijiagou
+  security:
+    user:
+      name: xiaowei
+      password: xiaoweijiagou
 ```
 
 
