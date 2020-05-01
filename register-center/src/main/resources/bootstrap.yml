@@ -7,7 +7,7 @@ eureka:
   client:
     serviceUrl:
       defaultZone: http://local.register.com:${server.port}/eureka/
-    register-with-eureka: true
+    register-with-eureka: false
     fetch-registry: false
     registry-fetch-interval-seconds: 5
   instance:
