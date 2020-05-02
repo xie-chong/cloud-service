@@ -478,6 +478,8 @@ cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Contro
 
 ---
 
+登陆入口 TokenEndpoint.class 里的post方法，根据用户名获取用户信息在 UserDetailServiceImpl.java,密码相关大的配置在 SecurityConfig.java ，密码校验在 AbstractUserDetailsAuthenticationProvider.class、DaoAuthenticationProvider.class
+
 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
 ```
 @FrameworkEndpoint
@@ -512,7 +514,7 @@ public class TokenEndpoint extends AbstractEndpoint {
 **test**
 
 1. 修改 bootstrap.yml 里配置的端口为固定值 user-center 7777， oauth-center 8888
-2. 修改请求地址 security.oauth2
+2. 修改请求地址 security.oauth2.resource.user-info-uri ，改为 http://localhost:8888/user-me
 
 cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
 ```
@@ -624,7 +626,7 @@ public class UserDetailServiceImpl implements UserDetailsService {
 }
 ```
 
-密码校验
+密码校验是由 spring-security 框架完成的，在配置类中我们指定了一些自己的实现。
 
 cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\SecurityConfig.java
 ```
@@ -698,7 +700,7 @@ public abstract class AbstractUserDetailsAuthenticationProvider implements Authe
 
 
 
-当我们要访问一个接口的时候，首先要会根据access_token到下面地址获取当前登陆用户,（包含权限信息，这样我们就可以利用框架本身来做鉴权，有关的用户获取，密码校验我们做了重写，参考SecurityConfig.java）
+当我们要访问一个接口的时候，首先要会根据access_token到下面地址获取当前登陆用户,（包含权限信息，这样我们就可以利用框架本身来做鉴权，有关的用户获取，密码校验我们做了重写，参考SecurityConfig.java、UserDetailServiceImpl.java）
 ```
 security:
   oauth2:
@@ -737,6 +739,51 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 }
 ```
+
+获取当前登陆用户
+
+cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
+```
+@Slf4j
+@RestController
+public class UserController {
+
+    @Autowired
+    private AppUserService appUserService;
+
+    /** 当前登录用户 LoginAppUser */
+    @GetMapping("/users/current")
+    public LoginAppUser getLoginAppUser() {
+        return AppUserUtil.getLoginAppUser();
+    }
+
+    @GetMapping(value = "/users-anon/internal", params = "username")
+    public LoginAppUser findByUsername(String username) {
+        return appUserService.findByUsername(username);
+    }
+    // .......
+```
+
+直接请求 localhost:7777/users/current
+response:
+```
+{
+    "timestamp": "2020-05-02T12:09:41.400+0000",
+    "status": 401,
+    "error": "Unauthorized",
+    "message": "No message available",
+    "path": "/users/current"
+}
+```
+
+需要带上access_token
+localhost:7777/users/current?access_token=aef49bd6-cb60-4809-ba24-c7292020d3dc
+
+即用户中心获取access_token后，需要获取当前登陆用户信息/users/current，会通过security中配置的地址访问认证中心，得到结果后，通过工具类 AppUserUtil.getLoginAppUser(); 解析出当前登陆用户信息。
+
+
+
+
 我们有两种方式来访问接口
 1. url参数中含有access_token http://localhost:7777/users/current?access_token=0cf23b5f-912f-46c4-9fd0-5402398b0f7f
 2. header里有Authorization
@@ -744,3 +791,5 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 |  key  |  价格  |
 |  :----  |  :----  |
 |  Authorization  |  Bearer 0cf23b5f-912f-46c4-9fd0-5402398b0f7f  |
+
+
