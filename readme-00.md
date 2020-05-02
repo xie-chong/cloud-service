@@ -586,3 +586,161 @@ RESPONSE:
 }
 ```
 
+* **access_token**： 登陆之后返回给前端的一个登陆凭证，前端以后访问别的接口，带上它，就相当于登陆了。我们采用的时redis的uuid，没有使用JWT，可以在oauth-center.yml中配置。
+* **token_type**： bearer
+* **refresh_token**： 因为 access_token 有过期时间，需要通过它来重新获取access_token,避免重新登陆。对应表字段 oauth_client_details.refresh_token_validity
+* **expires_in**： access_token 过期时间，access_token,对应表字段 oauth_client_details.access_token_validity
+* **scope**： app"
+
+redis 中存储的内容
+```
+127.0.0.1:6379> get refresh_to_access:d33f351a-2eae-419f-a674-732209d75834
+"0cf23b5f-912f-46c4-9fd0-5402398b0f7f"
+
+```
+
+5. 认证中心的登陆核心
+
+核心 cloud-service\oauth-center\src\main\java\com\cloud\oauth\service\impl\UserDetailServiceImpl.java
+```
+@Slf4j
+@Service("userDetailsService")
+public class UserDetailServiceImpl implements UserDetailsService {
+
+    @Autowired
+    private UserClient userClient;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		// 用户中心查询
+        LoginAppUser loginAppUser = userClient.findByUsername(username);
+        if (loginAppUser == null) {
+            throw new AuthenticationCredentialsNotFoundException("用户不存在");
+        } else if (!loginAppUser.isEnabled()) {
+            throw new DisabledException("用户已作废");
+        }
+        return loginAppUser;
+    }
+}
+```
+
+密码校验
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\SecurityConfig.java
+```
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+	@Autowired
+	public UserDetailsService userDetailsService;
+	@Autowired
+	private BCryptPasswordEncoder passwordEncoder;
+
+	@Autowired
+	@Override
+	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+		auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder);
+	}
+// ......
+```
+
+org\springframework\security\authentication\dao\AbstractUserDetailsAuthenticationProvider.class
+```
+public abstract class AbstractUserDetailsAuthenticationProvider implements AuthenticationProvider, InitializingBean, MessageSourceAware {
+  // ......
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        Assert.isInstanceOf(UsernamePasswordAuthenticationToken.class, authentication, this.messages.getMessage("AbstractUserDetailsAuthenticationProvider.onlySupports", "Only UsernamePasswordAuthenticationToken is supported"));
+        String username = authentication.getPrincipal() == null ? "NONE_PROVIDED" : authentication.getName();
+        boolean cacheWasUsed = true;
+        UserDetails user = this.userCache.getUserFromCache(username);
+        if (user == null) {
+            cacheWasUsed = false;
+
+            try {
+                user = this.retrieveUser(username, (UsernamePasswordAuthenticationToken)authentication);
+            } catch (UsernameNotFoundException var6) {
+                this.logger.debug("User '" + username + "' not found");
+                if (this.hideUserNotFoundExceptions) {
+                    throw new BadCredentialsException(this.messages.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
+                }
+
+                throw var6;
+            }
+
+            Assert.notNull(user, "retrieveUser returned null - a violation of the interface contract");
+        }
+
+        try {
+            this.preAuthenticationChecks.check(user);
+            this.additionalAuthenticationChecks(user, (UsernamePasswordAuthenticationToken)authentication);
+        } catch (AuthenticationException var7) {
+            if (!cacheWasUsed) {
+                throw var7;
+            }
+
+            cacheWasUsed = false;
+            user = this.retrieveUser(username, (UsernamePasswordAuthenticationToken)authentication);
+            this.preAuthenticationChecks.check(user);
+            this.additionalAuthenticationChecks(user, (UsernamePasswordAuthenticationToken)authentication);
+        }
+
+        this.postAuthenticationChecks.check(user);
+        if (!cacheWasUsed) {
+            this.userCache.putUserInCache(user);
+        }
+
+        Object principalToReturn = user;
+        if (this.forcePrincipalAsString) {
+            principalToReturn = user.getUsername();
+        }
+```
+
+
+
+当我们要访问一个接口的时候，首先要会根据access_token到下面地址获取当前登陆用户,（包含权限信息，这样我们就可以利用框架本身来做鉴权，有关的用户获取，密码校验我们做了重写，参考SecurityConfig.java）
+```
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://local.gateway.com:8080/api-o/user-me
+      prefer-token-info: false
+```
+
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\ResourceServerConfig.java
+```
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+// ......
+	/**
+	 * 判断来源请求是否包含oauth2授权信息<br>
+	 * url参数中含有access_token,或者header里有Authorization
+	 */
+	private static class OAuth2RequestedMatcher implements RequestMatcher {
+		@Override
+		public boolean matches(HttpServletRequest request) {
+			// 请求参数中包含access_token参数
+			if (request.getParameter(OAuth2AccessToken.ACCESS_TOKEN) != null) {
+				return true;
+			}
+
+			// 头部的Authorization值以Bearer开头
+			String auth = request.getHeader("Authorization");
+			if (auth != null) {
+				return auth.startsWith(OAuth2AccessToken.BEARER_TYPE);
+			}
+			return false;
+		}
+	}
+
+}
+```
+我们有两种方式来访问接口
+1. url参数中含有access_token http://localhost:7777/users/current?access_token=0cf23b5f-912f-46c4-9fd0-5402398b0f7f
+2. header里有Authorization
+
+|  key  |  价格  |
+|  :----  |  :----  |
+|  Authorization  |  Bearer 0cf23b5f-912f-46c4-9fd0-5402398b0f7f  |
