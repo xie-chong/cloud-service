@@ -1,4 +1,12 @@
-# 随笔
+# <p align="center">随笔</p>
+
+- [04.7 多账户-用户凭证表](#04.7)   
+- [04.8 放开某url的权限](#04.8)   
+- [05.1 认证中心代码结构](#05.1)   
+- [05.2 FeignClient简单介绍](#05.2)   
+- [05.3 认证中心配置类和接口](#05.3)   
+- [05.4 登陆和鉴权](#05.4)   
+
 
 ## 1
 
@@ -127,7 +135,16 @@ demo:
 ```
 
 
-## 04.7 多账户-用户凭证表
+
+
+
+
+
+
+---
+<h2 id="04.7">04.7 多账户-用户凭证表</h2>
+
+---
 
 当系统支持多种类型登陆时（手机号、用户名、微信号），我们可以创建一张用户凭证表，以便在同一个用户id下支持多种登陆类型。
 
@@ -143,7 +160,15 @@ table:user_credentials
 select u.* from app_user u inner join user_credentials c on c.userId = u.id where c.username = '13247610000';
 ```
 
-## 04.8 放开某url的权限
+
+
+
+
+
+---
+<h2 id="04.8">04.8 放开某url的权限</h2>
+
+---
 
 除了认证中心 oauth-center 需要配置两个地方（ResourceServerConfig.java、SecurityConfig.java），其他服务只需要配置一个地方（ResourceServerConfig.java）。
 
@@ -187,7 +212,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 
 
-## 05.1 认证中心代码结构
+
+
+
+---
+<h2 id="05.1">05.1 认证中心代码结构</h2>
+
+---
 
 cloud-service\config-center\src\main\resources\configs\dev\oauth-center.yml中
 ```
@@ -204,7 +235,15 @@ Ribbon进行客户端负载均衡的Client并不是在服务启动的时候就�
 因此我们可以通过设置，**开启Ribbon的饥饿加载模式**
 
 
-## 05.2 FeignClient简单介绍
+
+
+
+
+
+---
+<h2 id="05.2">05.2 FeignClient简单介绍</h2>
+
+---
 
 cloud-service\oauth-center\src\main\java\com\cloud\oauth\OAuthCenterApplication.java
 ```
@@ -293,7 +332,15 @@ public class UserDetailServiceImpl implements UserDetailsService {
 // ......
 ```
 
-## 05.3 认证中心配置类和接口
+
+
+
+
+
+---
+<h2 id="05.3">05.3 认证中心配置类和接口</h2>
+
+---
 
 ### 认证中心 oauth-center 是一个授权服务器
 
@@ -423,7 +470,13 @@ cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Contro
 
 
 
-## 05.4 登陆和鉴权
+
+
+
+---
+<h2 id="05.4">05.4 登陆和鉴权</h2>
+
+---
 
 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
 ```
