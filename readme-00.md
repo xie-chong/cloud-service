@@ -700,6 +700,112 @@ public abstract class AbstractUserDetailsAuthenticationProvider implements Authe
 
 
 
+获取当前登陆用户
+
+cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
+```
+@Slf4j
+@RestController
+public class UserController {
+
+    @Autowired
+    private AppUserService appUserService;
+
+    /** 当前登录用户 LoginAppUser */
+    @GetMapping("/users/current")
+    public LoginAppUser getLoginAppUser() {
+        return AppUserUtil.getLoginAppUser();
+    }
+
+    @GetMapping(value = "/users-anon/internal", params = "username")
+    public LoginAppUser findByUsername(String username) {
+        return appUserService.findByUsername(username);
+    }
+    // .......
+```
+
+直接请求 localhost:7777/users/current
+response:
+```
+{
+    "timestamp": "2020-05-02T12:09:41.400+0000",
+    "status": 401,
+    "error": "Unauthorized",
+    "message": "No message available",
+    "path": "/users/current"
+}
+```
+
+需要带上access_token
+localhost:7777/users/current?access_token=aef49bd6-cb60-4809-ba24-c7292020d3dc
+response:
+```
+{
+    "id": 1,
+    "username": "admin",
+    "password": "$2a$10$3uOoX1ps14CxuotogUoDreW8zXJOZB9XeGdrC/xDV36hhaE8Rn9HO",
+    "nickname": "测试1",
+    "headImgUrl": "",
+    "phone": "",
+    "sex": 1,
+    "enabled": true,
+    "type": "APP",
+    "createTime": "2018-01-17T08:57:01.000+0000",
+    "updateTime": "2018-01-17T08:57:01.000+0000",
+    "sysRoles": [
+        {
+            "id": 1,
+            "code": "SUPER_ADMIN",
+            "name": "超级管理员",
+            "createTime": "2018-01-19T12:32:16.000+0000",
+            "updateTime": "2018-01-19T12:32:18.000+0000"
+        }
+    ],
+    "permissions": [
+        "back:menu:set2role",
+        "mail:update",
+        "back:permission:delete",
+        "role:permission:byroleid",
+        "back:menu:save",
+        "back:menu:query",
+        "ip:black:query",
+        "client:query",
+        "ip:black:save",
+        "file:del",
+        "ip:black:delete",
+        "mail:query",
+        "back:user:query",
+        "back:role:permission:set",
+        "sms:query",
+        "back:role:query",
+        "client:save",
+        "back:permission:query",
+        "back:user:role:set",
+        "back:role:save",
+        "log:query",
+        "file:query",
+        "client:update",
+        "back:menu:update",
+        "back:role:update",
+        "back:role:delete",
+        "back:user:password",
+        "back:menu:delete",
+        "back:user:update",
+        "menu:byroleid",
+        "client:del",
+        "mail:save",
+        "user:role:byuid",
+        "back:permission:save",
+        "back:permission:update"
+    ],
+    "credentialsNonExpired": true,
+    "accountNonLocked": true,
+    "accountNonExpired": true
+}
+```
+
+即用户中心获取access_token后，需要获取当前登陆用户信息/users/current，会通过security中配置的地址访问认证中心，得到结果后，通过工具类 AppUserUtil.getLoginAppUser(); 解析出当前登陆用户信息。
+
 当我们要访问一个接口的时候，首先要会根据access_token到下面地址获取当前登陆用户,（包含权限信息，这样我们就可以利用框架本身来做鉴权，有关的用户获取，密码校验我们做了重写，参考SecurityConfig.java、UserDetailServiceImpl.java）
 ```
 security:
@@ -739,49 +845,6 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 }
 ```
-
-获取当前登陆用户
-
-cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
-```
-@Slf4j
-@RestController
-public class UserController {
-
-    @Autowired
-    private AppUserService appUserService;
-
-    /** 当前登录用户 LoginAppUser */
-    @GetMapping("/users/current")
-    public LoginAppUser getLoginAppUser() {
-        return AppUserUtil.getLoginAppUser();
-    }
-
-    @GetMapping(value = "/users-anon/internal", params = "username")
-    public LoginAppUser findByUsername(String username) {
-        return appUserService.findByUsername(username);
-    }
-    // .......
-```
-
-直接请求 localhost:7777/users/current
-response:
-```
-{
-    "timestamp": "2020-05-02T12:09:41.400+0000",
-    "status": 401,
-    "error": "Unauthorized",
-    "message": "No message available",
-    "path": "/users/current"
-}
-```
-
-需要带上access_token
-localhost:7777/users/current?access_token=aef49bd6-cb60-4809-ba24-c7292020d3dc
-
-即用户中心获取access_token后，需要获取当前登陆用户信息/users/current，会通过security中配置的地址访问认证中心，得到结果后，通过工具类 AppUserUtil.getLoginAppUser(); 解析出当前登陆用户信息。
-
-
 
 
 我们有两种方式来访问接口
