@@ -478,6 +478,8 @@ cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Contro
 
 ---
 
+[UML-AbstractUserDetailsAuthenticationProvider](https://github.com/xie-chong/cloud-service/issues/3)
+
 登陆入口 TokenEndpoint.class 里的post方法，根据用户名获取用户信息在 UserDetailServiceImpl.java,密码相关大的配置在 SecurityConfig.java ，密码校验在 AbstractUserDetailsAuthenticationProvider.class、DaoAuthenticationProvider.class
 
 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
