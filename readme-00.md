@@ -6,6 +6,10 @@
 - [05.2 FeignClient简单介绍](#05.2)   
 - [05.3 认证中心配置类和接口](#05.3)   
 - [05.4 登陆和鉴权](#05.4)   
+- [05.5 生成access_token的核心源码](#05.5)   
+
+
+
 
 
 ## 1
@@ -856,5 +860,86 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 |  key  |  价格  |
 |  :----  |  :----  |
 |  Authorization  |  Bearer 0cf23b5f-912f-46c4-9fd0-5402398b0f7f  |
+
+
+
+
+
+
+
+
+---
+<h2 id="05.5">05.5 生成access_token的核心源码</h2>
+
+---
+
+登陆成功之后产生access_token
+
+入口 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
+```
+    @RequestMapping(
+        value = {"/oauth/token"},
+        method = {RequestMethod.POST}
+    )
+    public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+```
+可以使用POST请求来测试
+
+REQUEST：   
+http://localhost:8888/oauth/token?grant_type=password&client_id=system&client_secret=system&scope=app&username=admin&password=admin
+
+参数对应表 ```select * from oauth_client_details;```
+该表也是底层核心所使用的org\springframework\security\oauth2\provider\client\JdbcClientDetailsService.class
+
+RESPONSE:
+```
+{
+    "access_token": "0cf23b5f-912f-46c4-9fd0-5402398b0f7f",
+    "token_type": "bearer",
+    "refresh_token": "d33f351a-2eae-419f-a674-732209d75834",
+    "expires_in": 28799,
+    "scope": "app"
+}
+```
+
+
+**TokenEndpoint.class 重点逻辑 postAccessToken() 产生了access_token、refresh_token**
+```
+public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+// ......
+
+            ClientDetails authenticatedClient = this.getClientDetailsService().loadClientByClientId(clientId);
+            TokenRequest tokenRequest = this.getOAuth2RequestFactory().createTokenRequest(parameters, authenticatedClient);
+
+// ......
+
+                    OAuth2AccessToken token = this.getTokenGranter().grant(tokenRequest.getGrantType(), tokenRequest);
+// ......
+                }
+            }
+        }
+    }
+```
+
+**在基于springboot框架的项目中，若底层已经有实现逻辑，我们想改变，那么就必须使用配置类来加载和实则自己的实现**
+
+比如此处，```public interface ClientDetailsService {}```的实现是```public class JdbcClientDetailsService {}```，而我们想通过redis来做个缓存优化，于是我们创建了```public class RedisClientDetailsService extends JdbcClientDetailsService {}```，再通过配置类来加载相关的实现逻辑```public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {}```
+
+**refresh_token的作用**
+
+* 当access_token未过期时，返回的access_token值不变，但时间在减小；
+* 当access_token过期时，我们可以使用refresh_token来重新获取access_token，此时获取的access_token是一个新值，refresh_token的值不变；
+* 若采用jwt，则每次刷新之后access_token、refresh_token都会发生变化。
+
+直接请求登陆接口，此时不需要用户名和密码，其他参数响应的变化一下 grant_type=refresh_token，最后追加上 refresh_token=d33f351a-2eae-419f-a674-732209d75834
+
+REQUEST:
+
+http://localhost:8888/oauth/token?grant_type=refresh_token&client_id=system&client_secret=system&scope=app&refresh_token=d33f351a-2eae-419f-a674-732209d75834
+
+
+
+
+
 
 
