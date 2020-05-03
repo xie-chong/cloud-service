@@ -1,3 +1,3 @@
 # <p align="center">文档图像</p>
 
-[uml](/issues/3)
+[uml](https://github.com/xie-chong/cloud-service/issues/3)
