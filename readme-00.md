@@ -6,8 +6,8 @@
 - [05.2 FeignClient简单介绍](#05.2)   
 - [05.3 认证中心配置类和接口](#05.3)   
 - [05.4 登陆和鉴权](#05.4)   
-- [05.5 生成access_token的核心源码](#05.5)   
-
+- [05.5 生成 access_token 的核心源码](#05.5)   
+- [05.6 根据 access_token 获取当前用户的核心源码](#05.6)   
 
 
 
@@ -945,3 +945,49 @@ http://localhost:8888/oauth/token?grant_type=refresh_token&client_id=system&clie
 
 
 
+
+
+
+---
+<h2 id="05.6">05.6 根据 access_token 获取当前用户的核心源码</h2>
+
+---
+
+### Filter
+
+ 注解**@EnableResourceServer**帮我们加入了 org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter，该filter帮我们从request里解析出 access_token(先从头里找```request.getHeaders("Authorization");```，不存在再从参数里面找```request.getParameter("access_token");```)，转换成Authentication对象，并通过org.springframework.security.oauth2.provider.token.DefaultTokenServices根据access_token和认证服务器配置里的TokenStore从redis或者jwt里解析出用户存储到SecurityContext里。
+
+ **注意**：认证中心的@EnableResourceServer和别的微服务里的@EnableResourceServer有些不同。别的微服务是通过org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices来获取用户的。
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\ResourceServerConfig.java
+```
+/** 资源服务配置 */
+@Configuration
+@EnableResourceServer
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+```
+
+### 获取当前登陆用户
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\controller\OAuth2Controller.java
+```
+@Slf4j
+@RestController
+@RequestMapping
+public class OAuth2Controller {
+    /**
+     * 当前登陆用户信息
+     * security获取当前登录用户的方法是SecurityContextHolder.getContext().getAuthentication()
+     * 返回值是接口org.springframework.security.core.Authentication，又继承了Principal
+     * 这里的实现类是org.springframework.security.oauth2.provider.OAuth2Authentication
+     */
+    @GetMapping("/user-me")
+    public Authentication principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        log.debug("user-me:{}", authentication.getName());
+        return authentication;
+    }
+// ......
+```
+
+即先通过filter设置，然后再请求"/user-me"获取
