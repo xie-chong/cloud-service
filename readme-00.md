@@ -873,6 +873,8 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 ---
 
+[UML-TokenEndpoint](https://github.com/xie-chong/cloud-service/issues/4)
+
 登陆成功之后产生access_token
 
 入口 org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
