@@ -957,7 +957,7 @@ http://localhost:8888/oauth/token?grant_type=refresh_token&client_id=system&clie
 
 ### Filter
 
-注解** @EnableResourceServer **帮我们加入了 org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter，该filter帮我们从request里解析出 access_token(先从头里找```request.getHeaders("Authorization");```，不存在再从参数里面找```request.getParameter("access_token");```)，转换成Authentication对象，并通过org.springframework.security.oauth2.provider.token.DefaultTokenServices根据access_token和认证服务器配置里的TokenStore从redis或者jwt里解析出用户存储到SecurityContext里。
+注解**@EnableResourceServer**帮我们加入了 org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationProcessingFilter，该filter帮我们从request里解析出 access_token(先从头里找```request.getHeaders("Authorization");```，不存在再从参数里面找```request.getParameter("access_token");```)，转换成Authentication对象，并通过org.springframework.security.oauth2.provider.token.DefaultTokenServices根据access_token和认证服务器配置里的TokenStore从redis或者jwt里解析出用户存储到SecurityContext里。
 
  **注意**：认证中心的@EnableResourceServer和别的微服务里的@EnableResourceServer有些不同。别的微服务是通过org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices来获取用户的。
 
