@@ -8,7 +8,7 @@
 - [05.4 登陆和鉴权](#05.4)   
 - [05.5 生成 access_token 的核心源码](#05.5)   
 - [05.6 根据 access_token 获取当前用户的核心源码](#05.6)   
-
+- [05.7 认证中心获取当前登陆用户核心代码](#05.7)   
 
 
 
@@ -1002,13 +1002,65 @@ public class OAuth2Controller {
 
 
 
-```
-st=>start: 用户登陆
-op=>operation: 登陆操作
-cond=>condition: 登陆成功 Yes or No?
-e=>end: 进入后台
+---
+<h2 id="05.7">05.7 认证中心获取当前登陆用户核心代码</h2>
 
-st->op->cond
-cond(yes)->e
-cond(no)->op
+---
+
+[UML-05-7](https://github.com/xie-chong/cloud-service/issues/6)
+
+重点逻辑代码
+
+org\springframework\security\oauth2\provider\authentication\OAuth2AuthenticationManager.class
 ```
+	// ......
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        if (authentication == null) {
+            throw new InvalidTokenException("Invalid token (token not found)");
+        } else {
+            String token = (String)authentication.getPrincipal();
+            OAuth2Authentication auth = this.tokenServices.loadAuthentication(token);
+	// ......
+```
+
+org\springframework\security\oauth2\provider\token\DefaultTokenServices.class
+```
+// ......
+public OAuth2Authentication loadAuthentication(String accessTokenValue) throws AuthenticationException, InvalidTokenException {
+        OAuth2AccessToken accessToken = this.tokenStore.readAccessToken(accessTokenValue);
+        if (accessToken == null) {
+            throw new InvalidTokenException("Invalid access token: " + accessTokenValue);
+        } else if (accessToken.isExpired()) {
+            this.tokenStore.removeAccessToken(accessToken);
+            throw new InvalidTokenException("Access token expired: " + accessTokenValue);
+        } else {
+            OAuth2Authentication result = this.tokenStore.readAuthentication(accessToken);
+            if (result == null) {
+                throw new InvalidTokenException("Invalid access token: " + accessTokenValue);
+            } else {
+                if (this.clientDetailsService != null) {
+                    String clientId = result.getOAuth2Request().getClientId();
+
+                    try {
+                        this.clientDetailsService.loadClientByClientId(clientId);
+                    } catch (ClientRegistrationException var6) {
+                        throw new InvalidTokenException("Client not valid: " + clientId, var6);
+                    }
+                }
+
+                return result;
+            }
+        }
+    }
+// ......
+```
+
+**test**
+
+1. 获取access_token
+请求 http://localhost:8888/oauth/token?grant_type=password&client_id=system&client_secret=system&scope=app&username=admin&password=admin
+2. debug模式下，查看从redis获取access_token流程
+请求 http://localhost:8888/user-me?access_token=314b2379-5802-409a-a843-71d6f47ed038
+其中涉及序列化后```this.serializeKey("access:" + tokenValue);
+// ...... this.deserializeAccessToken(bytes)```。**redis key**为```"access:" + tokenValue```
+3. 有了access_token之后，再获取 OAuth2Authentication 对象```OAuth2Authentication result = this.tokenStore.readAuthentication(accessToken);```。**redis key**为```"auth:" + tokenValue```
