@@ -923,6 +923,24 @@ public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @R
     }
 ```
 
+项目 cloud-service 通过如下方法在redis里面查询不到 access_token、refresh_token，每次登陆都是重新生成access_token、refresh_token。
+
+org\springframework\security\oauth2\provider\token\store\redis\RedisTokenStore.class
+```
+public OAuth2AccessToken getAccessToken(OAuth2Authentication authentication) {
+        String key = this.authenticationKeyGenerator.extractKey(authentication);
+        byte[] serializedKey = this.serializeKey("auth_to_access:" + key);
+        byte[] bytes = null;
+        RedisConnection conn = this.getConnection();
+
+        byte[] bytes;
+        try {
+            bytes = conn.get(serializedKey);
+        } finally {
+            conn.close();
+        }
+```
+
 **在基于springboot框架的项目中，若底层已经有实现逻辑，我们想改变，那么就必须使用配置类来加载和实则自己的实现**
 
 比如此处，```public interface ClientDetailsService {}```的实现是```public class JdbcClientDetailsService {}```，而我们想通过redis来做个缓存优化，于是我们创建了```public class RedisClientDetailsService extends JdbcClientDetailsService {}```，再通过配置类来加载相关的实现逻辑```public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {}```
