@@ -1095,6 +1095,8 @@ public OAuth2Authentication loadAuthentication(String accessTokenValue) throws A
 
 ---
 
+[UML-05-8](https://github.com/xie-chong/cloud-service/issues/7)
+
 比如用户中心也有注解**@EnableResourceServer**，其中的filter将会把access_token解析出来，关键的区别在于
 * 认证中心使用的是 org\springframework\security\oauth2\provider\token\DefaultTokenServices.class
 * 别的微服务使用的是 org\springframework\boot\autoconfigure\security\oauth2\resource\UserInfoTokenServices.class
