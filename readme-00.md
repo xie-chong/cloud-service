@@ -9,7 +9,7 @@
 - [05.5 生成 access_token 的核心源码](#05.5)   
 - [05.6 根据 access_token 获取当前用户的核心源码](#05.6)   
 - [05.7 认证中心获取当前登陆用户核心代码](#05.7)   
-
+- [05.8 别的微服务获取当前登陆用户核心代码](#05.8)   
 
 
 ## 1
@@ -1082,3 +1082,69 @@ public OAuth2Authentication loadAuthentication(String accessTokenValue) throws A
 其中涉及序列化后```this.serializeKey("access:" + tokenValue);
 // ...... this.deserializeAccessToken(bytes)```。**redis key**为```"access:" + tokenValue```
 3. 有了access_token之后，再获取 OAuth2Authentication 对象```OAuth2Authentication result = this.tokenStore.readAuthentication(accessToken);```。**redis key**为```"auth:" + tokenValue```
+
+
+
+
+
+
+
+
+---
+<h2 id="05.8">05.8 别的微服务获取当前登陆用户核心代码</h2>
+
+---
+
+比如用户中心也有注解**@EnableResourceServer**，其中的filter将会把access_token解析出来，关键的区别在于
+* 认证中心使用的是 org\springframework\security\oauth2\provider\token\DefaultTokenServices.class
+* 别的微服务使用的是 org\springframework\boot\autoconfigure\security\oauth2\resource\UserInfoTokenServices.class
+
+
+org\springframework\security\oauth2\provider\authentication\OAuth2AuthenticationManager.class
+```
+public class OAuth2AuthenticationManager implements AuthenticationManager, InitializingBean {
+    private ResourceServerTokenServices tokenServices;
+    // ......
+
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+            // ......
+            OAuth2Authentication auth = this.tokenServices.loadAuthentication(token);
+            // ......
+```
+
+当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
+
+cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
+```
+security:
+  oauth2:
+    resource:
+      user-info-uri: http://localhost:8888/user-me
+      prefer-token-info: false
+```
+
+org\springframework\boot\autoconfigure\security\oauth2\resource\UserInfoTokenServices.class
+```
+public class UserInfoTokenServices implements ResourceServerTokenServices {
+    // ......
+    public OAuth2Authentication loadAuthentication(String accessToken) throws AuthenticationException, InvalidTokenException {
+        Map<String, Object> map = this.getMap(this.userInfoEndpointUrl, accessToken);
+        if (map.containsKey("error")) {
+            if (this.logger.isDebugEnabled()) {
+                this.logger.debug("userinfo returned error: " + map.get("error"));
+            }
+
+            throw new InvalidTokenException(accessToken);
+        } else {
+            return this.extractAuthentication(map);
+        }
+    }
+    // ......
+```
+
+
+
+
+
+
+
