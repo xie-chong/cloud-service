@@ -1114,7 +1114,7 @@ public class OAuth2AuthenticationManager implements AuthenticationManager, Initi
             // ......
 ```
 
-当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
+user-info-uri原理是在授权服务器认证后将认证信息Principal通过形参绑定的方法通过URL的方式获取用户信息。换句话说，就是当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
 
 cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
 ```
