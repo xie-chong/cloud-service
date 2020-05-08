@@ -1114,7 +1114,7 @@ public class OAuth2AuthenticationManager implements AuthenticationManager, Initi
             // ......
 ```
 
-user-info-uri原理是在授权服务器认证后将认证信息Principal通过形参绑定的方法通过URL的方式获取用户信息。换句话说，就是当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
+**user-info-uri原理 **是在授权服务器认证后将认证信息Principal通过形参绑定的方法通过URL的方式获取用户信息。换句话说，就是当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
 
 cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
 ```
@@ -1145,8 +1145,102 @@ public class UserInfoTokenServices implements ResourceServerTokenServices {
 ```
 
 
+**那么底层代码是如何来决定使用哪一个实现类呢？（DefaultTokenServices.class、UserInfoTokenServices.class）**
 
+org\springframework\security\oauth2\config\annotation\web\configurers\ResourceServerSecurityConfigurer.class
+```
+public final class ResourceServerSecurityConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
 
+    // ......
+    private AuthenticationManager oauthAuthenticationManager(HttpSecurity http) {
+        OAuth2AuthenticationManager oauthAuthenticationManager = new OAuth2AuthenticationManager();
+        if (this.authenticationManager != null) {
+            if (!(this.authenticationManager instanceof OAuth2AuthenticationManager)) {
+                return this.authenticationManager;
+            }
 
+            oauthAuthenticationManager = (OAuth2AuthenticationManager)this.authenticationManager;
+        }
 
+        oauthAuthenticationManager.setResourceId(this.resourceId);
+        oauthAuthenticationManager.setTokenServices(this.resourceTokenServices(http));
+        oauthAuthenticationManager.setClientDetailsService(this.clientDetails());
+        return oauthAuthenticationManager;
+    }
+
+    private ResourceServerTokenServices resourceTokenServices(HttpSecurity http) {
+        this.tokenServices(http);
+        return this.resourceTokenServices;
+    }
+
+    private ResourceServerTokenServices tokenServices(HttpSecurity http) {
+        if (this.resourceTokenServices != null) {
+            return this.resourceTokenServices;
+        } else {
+            DefaultTokenServices tokenServices = new DefaultTokenServices();
+            tokenServices.setTokenStore(this.tokenStore());
+            tokenServices.setSupportRefreshToken(true);
+            tokenServices.setClientDetailsService(this.clientDetails());
+            this.resourceTokenServices = tokenServices;
+            return tokenServices;
+        }
+    }
+    // ......
+}
+```
+
+org\springframework\boot\autoconfigure\security\oauth2\resource\ResourceServerProperties.class
+```
+@ConfigurationProperties(
+    prefix = "security.oauth2.resource"
+)
+public class ResourceServerProperties implements BeanFactoryAware {
+    // ......
+    private String userInfoUri;
+    // ......
+```
+
+org\springframework\boot\autoconfigure\security\oauth2\resource\ResourceServerTokenServicesConfiguration.class
+```
+@Configuration
+@ConditionalOnMissingBean({AuthorizationServerEndpointsConfiguration.class})
+public class ResourceServerTokenServicesConfiguration {
+    public ResourceServerTokenServicesConfiguration() {
+    }
+
+    // ......
+
+    private static class TokenInfoCondition extends SpringBootCondition {
+        private TokenInfoCondition() {
+        }
+
+        public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            Builder message = ConditionMessage.forCondition("OAuth TokenInfo Condition", new Object[0]);
+            Environment environment = context.getEnvironment();
+            Boolean preferTokenInfo = (Boolean)environment.getProperty("security.oauth2.resource.prefer-token-info", Boolean.class);
+            if (preferTokenInfo == null) {
+                preferTokenInfo = environment.resolvePlaceholders("${OAUTH2_RESOURCE_PREFERTOKENINFO:true}").equals("true");
+            }
+
+            String tokenInfoUri = environment.getProperty("security.oauth2.resource.token-info-uri");
+            String userInfoUri = environment.getProperty("security.oauth2.resource.user-info-uri");
+            if (!StringUtils.hasLength(userInfoUri) && !StringUtils.hasLength(tokenInfoUri)) {
+                return ConditionOutcome.match(message.didNotFind("user-info-uri property").atAll());
+            } else {
+                return StringUtils.hasLength(tokenInfoUri) && preferTokenInfo ? ConditionOutcome.match(message.foundExactly("preferred token-info-uri property")) : ConditionOutcome.noMatch(message.didNotFind("token info").atAll());
+            }
+        }
+    }
+    
+   // ......
+
+```
+另外需要注意的一点是，security的客户端和服务端pom.xml依赖是一样的。
+
+```
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-oauth2</artifactId>
+		</dependency>
+```
 
