@@ -10,6 +10,7 @@
 - [05.6 根据 access_token 获取当前用户的核心源码](#05.6)   
 - [05.7 认证中心获取当前登陆用户核心代码](#05.7)   
 - [05.8 别的微服务获取当前登陆用户核心代码](#05.8)   
+- [05.9 redis 缓存 oauth2 中的 client 信息](#05.9)   
 
 
 ## 1
@@ -1243,4 +1244,108 @@ public class ResourceServerTokenServicesConfiguration {
 			<artifactId>spring-cloud-starter-oauth2</artifactId>
 		</dependency>
 ```
+
+
+
+
+
+
+
+
+
+---
+<h2 id="05.9">05.9 redis 缓存 oauth2 中的 client 信息</h2>
+
+---
+
+[UML-05-9](https://github.com/xie-chong/cloud-service/issues/8)
+
+org\springframework\security\oauth2\provider\client\JdbcClientDetailsService.class
+
+JdbcClientDetailsService.class 去表oauth_client_details 中获取一些oauth认证需要的东西。
+```
+public class JdbcClientDetailsService implements ClientDetailsService, ClientRegistrationService {
+    // ......
+
+    public ClientDetails loadClientByClientId(String clientId) throws InvalidClientException {
+        try {
+            ClientDetails details = (ClientDetails)this.jdbcTemplate.queryForObject(this.selectClientDetailsSql, new JdbcClientDetailsService.ClientDetailsRowMapper(), new Object[]{clientId});
+            return details;
+        } catch (EmptyResultDataAccessException var4) {
+            throw new NoSuchClientException("No client with requested id: " + clientId);
+        }
+    }
+    // ......
+}
+```
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\service\impl\RedisClientDetailsService.java
+```
+/**
+ * 将oauth_client_details表数据缓存到redis，毕竟该表改动非常小，而且数据很少，这里做个缓存优化<br>
+ * 如果有通过界面修改client的需求的话，不要用JdbcClientDetailsService了，请用该类，否则redis里有缓存<br>
+ * 如果手动修改了该表的数据，请注意清除redis缓存，是hash结构，key是client_details
+ *
+ */
+@Slf4j
+@Service
+public class RedisClientDetailsService extends JdbcClientDetailsService {
+    // ......
+
+    private StringRedisTemplate stringRedisTemplate;
+
+    public RedisClientDetailsService(DataSource dataSource) {
+        super(dataSource);
+    }
+
+    // 缓存client的redis key，这里是hash结构存储
+    private static final String CACHE_CLIENT_KEY = "client_details";
+
+    @Override
+    public ClientDetails loadClientByClientId(String clientId) throws InvalidClientException {
+        ClientDetails clientDetails = null;
+        // 先从redis获取
+        String value = (String) stringRedisTemplate.boundHashOps(CACHE_CLIENT_KEY).get(clientId);
+        if (StringUtils.isBlank(value)) {
+            clientDetails = cacheAndGetClient(clientId);
+        } else {
+            clientDetails = JSONObject.parseObject(value, BaseClientDetails.class);
+        }
+        return clientDetails;
+    }
+    // ......
+
+     // 将oauth_client_details全表刷入redis
+    public void loadAllClientToCache() {
+        if (stringRedisTemplate.hasKey(CACHE_CLIENT_KEY) == Boolean.TRUE) {
+            return;
+        }
+        log.info("将oauth_client_details全表刷入redis");
+
+        List<ClientDetails> list = super.listClientDetails();
+        if (CollectionUtils.isEmpty(list)) {
+            log.error("oauth_client_details表数据为空，请检查");
+            return;
+        }
+    // ......
+}
+```
+
+在项目启动的时候，会把表里的数据缓存到redis里面
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\AuthorizationServerConfig.java
+```
+    // ......
+    public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
+        clients.withClientDetails(redisClientDetailsService);
+        redisClientDetailsService.loadAllClientToCache();
+    }
+    // ......
+```
+
+
+
+
+
+
+
 
