@@ -1331,8 +1331,8 @@ public class RedisClientDetailsService extends JdbcClientDetailsService {
 }
 ```
 
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\AuthorizationServerConfig.java   
 在项目启动的时候，会把表里的数据缓存到redis里面
-cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\AuthorizationServerConfig.java
 ```
     // ......
     public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
