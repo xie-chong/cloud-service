@@ -11,6 +11,7 @@
 - [05.7 认证中心获取当前登陆用户核心代码](#05.7)   
 - [05.8 别的微服务获取当前登陆用户核心代码](#05.8)   
 - [05.9 redis 缓存 oauth2 中的 client 信息](#05.9)   
+- [06.1 网关 zuul](#06.1)   
 
 
 ## 1
@@ -1346,5 +1347,293 @@ cloud-service\oauth-center\src\main\java\com\cloud\oauth\config\AuthorizationSer
 
 
 
+
+
+
+---
+<h2 id="06.1">06.1 网关 zuul</h2>
+
+---
+
+cloud-service\gateway-zuul\pom.xml
+```
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+		</dependency>
+```
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\GatewayApplication.java
+```
+@EnableFeignClients
+@EnableZuulProxy
+@EnableDiscoveryClient
+@SpringBootApplication
+public class GatewayApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(GatewayApplication.class, args);
+	}
+}
+```
+
+### 转发规则的核心配置
+cloud-service\config-center\src\main\resources\configs\dev\gateway-zuul.yml
+```
+zuul:
+  ignored-services: '*' # 表示禁用默认路由，只认我们自己配置的路由.
+  sensitiveHeaders: 
+  routes:
+    oauth:
+      path: /api-o/**
+	  # stripPrefix: true
+      serviceId: oauth-center
+    api-u:
+      path: /api-u/**
+      serviceId: user-center
+    backend:
+      path: /api-b/**
+      serviceId: manage-backend
+    log:
+      path: /api-l/**
+      serviceId: log-center
+    file:
+      path: /api-f/**
+      serviceId: file-center
+    sms:
+      path: /api-n/**
+      serviceId: notification-center
+  host:
+    connect-timeout-millis: 10000
+    socket-timeout-millis: 60000
+  add-proxy-headers: true
+  ribbon:
+    eager-load:
+      enabled: true
+```
+
+zuul 一般是用来作为网关服务开发，在涉及到转发路由的时候，zuul会改写request中的头部信息。那么怎么样在项目中配置呢？请看下面：   
+
+* sensitiveHeaders会过滤客户端附带的headers
+例如：zuul.sensitiveHeaders=Cookie,Set-Cookie
+如果客户端在发请求是带了Cookie，那么Cookie不会传递给下游服务。
+默认：zuul.sensitiveHeaders= 
+什么都不设置代表不过滤任何信息，但 zuul.sensitiveHeaders=  一定要附上  。
+
+* zuul.ignoredHeaders会过滤服务之间通信附带的headers
+例如：zuul.ignoredHeaders=Cookie,Set-Cookie
+如果客户端在发请求是带了Cookie，那么Cookie依然会传递给下游服务。但是如果下游服务再转发就会被过滤。作用与上面敏感的Header差不多，事实上sensitive-headers会被添加到ignored-headers中。
+
+* 还有一种情况就是客户端带了Cookie，在ZUUL的Filter中又addZuulRequestHeader("Cookie", "new"),
+那么客户端的Cookie将会被覆盖，此时不需要sensitiveHeaders。
+如果设置了sensitiveHeaders: Cookie，那么Filter中设置的Cookie依然不会被过滤。
+
+**zuul 里面的 stripPrefix 怎么使用？**
+stripPrefix ：代理前缀默认会从请求路径中移除，通过该设置关闭移除功能，
+* 当 stripPrefix=true 的时 （会移除）
+（http://local.gateway.com:8080/api-o/user-me -> http://local.gateway.com:8080/user-me，
+* 当stripPrefix=false的时（不会移除）
+（http://local.gateway.com:8080/api-o/user-me -> http://local.gateway.com:8080/api-o/user-me
+
+### 跨域配置
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\config\CrossDomainConfig.java
+```
+/**
+ * 跨域配置<br>
+ * 页面访问域名和后端接口地址的域名不一致时，会先发起一个OPTIONS的试探请求<br>
+ * 如果不设置跨域的话，js将无法正确访问接口，域名一致的话，不存在这个问题
+ */
+@Configuration
+public class CrossDomainConfig {
+
+    /**  跨域支持 */
+    @Bean
+    public CorsFilter corsFilter() {
+        final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        final CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true); // 允许cookies跨域
+        config.addAllowedOrigin("*");// #允许向该服务器提交请求的URI，*表示全部允许
+        config.addAllowedHeader("*");// #允许访问的头信息,*表示全部
+        config.setMaxAge(18000L);// 预检请求的缓存时间（秒），即在这个时间段里，对于相同的跨域请求不会再预检了
+        config.addAllowedMethod("*");// 允许提交请求的方法，*表示全部允许
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
+    }
+
+    //两种方式任选其一即可
+//    @Bean
+//    public WebMvcConfigurer corsConfigurer() {
+//        return new WebMvcConfigurer() {
+//            @Override
+//            public void addCorsMappings(CorsRegistry registry) {
+//                registry.addMapping("/**") // 拦截所有权请求
+//                        .allowedMethods("*") // 允许提交请求的方法，*表示全部允许
+//                        .allowedOrigins("*") // #允许向该服务器提交请求的URI，*表示全部允许
+//                        .allowCredentials(true) // 允许cookies跨域
+//                        .allowedHeaders("*") // #允许访问的头信息,*表示全部
+//                        .maxAge(18000L); // 预检请求的缓存时间（秒），即在这个时间段里，对于相同的跨域请求不会再预检了
+//            }
+//        };
+//    }
+}
+```
+
+### spring security配置
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\config\SecurityConfig.java
+```
+@EnableOAuth2Sso
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+	@Override
+	protected void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable();
+		http.headers().frameOptions().sameOrigin();
+		http.cors();
+	}
+}
+```
+
+关于**@EnableOAuth2Sso**可以自行查看相关文档https://www.cnblogs.com/trust-freedom/p/12002089.html
+
+### feign
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\feign\Oauth2Client.java
+```
+@FeignClient("oauth-center")
+public interface Oauth2Client {
+
+    /**
+     * 获取access_token<br>
+     * 这是spring-security-oauth2底层的接口，类TokenEndpoint<br>
+     * 感兴趣可看下视频章节05.5 生成access_token的核心源码
+     *
+     * @param parameters
+     * @return
+     * @see org.springframework.security.oauth2.provider.endpoint.TokenEndpoint
+     */
+    @PostMapping(path = "/oauth/token")
+    Map<String, Object> postAccessToken(@RequestParam Map<String, String> parameters);
+
+    /**
+     * 删除access_token和refresh_token<br>
+     * 认证中心的OAuth2Controller方法removeToken
+     *
+     * @param access_token
+     */
+    @DeleteMapping(path = "/remove_token")
+    void removeToken(@RequestParam("access_token") String access_token);
+}
+```
+
+### filter
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\filter\BlackIPAccessFilter.java
+```
+/**
+ * 黑名单IP拦截<br>
+ * 黑名单ip变化不会太频繁，<br>
+ * 考虑到性能，我们不实时掉接口从别的服务获取了，<br>
+ * 而是定时把黑名单ip列表同步到网关层,
+ */
+@Component
+public class BlackIPAccessFilter extends ZuulFilter {
+
+	/**  黑名单列表 */
+	private Set<String> blackIPs = new HashSet<>();
+
+	@Override
+	public boolean shouldFilter() {
+		if (blackIPs.isEmpty()) {
+			return false;
+		}
+
+		RequestContext requestContext = RequestContext.getCurrentContext();
+		HttpServletRequest request = requestContext.getRequest();
+		String ip = getIpAddress(request);
+
+		return blackIPs.contains(ip);// 判断ip是否在黑名单列表里
+	}
+
+	@Override
+	public Object run() {//真正的过滤逻辑
+		RequestContext requestContext = RequestContext.getCurrentContext();
+		requestContext.setResponseStatusCode(HttpStatus.FORBIDDEN.value());
+		requestContext.setResponseBody("black ip");
+		requestContext.setSendZuulResponse(false);
+
+		return null;
+	}
+
+	@Override
+	public int filterOrder() {
+		return 0;
+	}
+
+	@Override
+	public String filterType() {
+		return FilterConstants.PRE_TYPE;
+	}
+	// ......
+```
+
+
+通过继承ZuulFilter然后覆写上面的4个方法，就可以实现一个简单的过滤器，下面就相关注意点进行说明
+filterType：返回一个字符串代表过滤器的类型，在zuul中定义了四种不同生命周期的过滤器类型，具体如下：   
+* pre：可以在请求被路由之前调用
+* route：在路由请求时候被调用
+* post：在route和error过滤器之后被调用
+* error：处理请求时发生错误时被调用
+
+     Zuul的主要请求生命周期包括“pre”，“route”和“post”等阶段。对于每个请求，都会运行具有这些类型的所有过滤器。
+
+filterOrder：通过int值来定义过滤器的执行顺序
+
+shouldFilter：返回一个boolean类型来判断该过滤器是否要执行，所以通过此函数可实现过滤器的开关。在上例中，我们直接返回true，所以该过滤器总是生效
+
+run：过滤器的具体逻辑。需要注意，这里我们通过ctx.setSendZuulResponse(false)令zuul过滤该请求，不对其进行路由转发，然后通过ctx.setResponseStatusCode(401)设置了其返回的错误码
+
+[spring cloud-zuul的Filter详解_CSDN](https://blog.csdn.net/liuchuanhong1/article/details/62236793)
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\filter\InternalURIAccessFilter.java
+```
+/**
+ * 过滤uri<br>
+ * 该类uri不需要登陆，但又不允许外网通过网关调用，只允许微服务间在内网调用，<br>
+ * 为了方便拦截此场景的uri，我们自己约定一个规范，及uri中含有-anon/internal<br>
+ * 如在oauth登陆的时候用到根据username查询用户，<br>
+ * 用户系统提供的查询接口/users-anon/internal肯定不能做登录拦截，而该接口也不能对外网暴露<br>
+ * 如果有此类场景的uri，请用这种命名格式，
+ *
+ */
+@Component
+public class InternalURIAccessFilter extends ZuulFilter {
+```
+
+### 定时同步黑名单IP @Scheduled
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\filter\BlackIPAccessFilter.java
+```
+	/**  定时同步黑名单IP */
+	@Scheduled(cron = "${cron.black-ip}")
+	public void syncBlackIPList() {
+		try {
+			Set<String> list = backendClient.findAllBlackIPs(Collections.emptyMap());
+			blackIPs = list;
+		} catch (Exception e) {
+			// do nothing
+		}
+	}
+```
+
+cloud-service\config-center\src\main\resources\configs\dev\gateway-zuul.yml
+```
+cron:
+  black-ip: 0 0/5 * * * ?
+```
+
+如果有多个网关，需要使用ngix做代理，此时需要明确每一个网关服务的ip、port
 
 
