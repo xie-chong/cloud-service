@@ -13,6 +13,14 @@
 - [05.9 redis 缓存 oauth2 中的 client 信息](#05.9)   
 - [06.1 网关 zuul](#06.1)   
 - [06.2 网关端口说明](#06.2)   
+- [07.1 日志中心讲解](#07.1)   
+
+
+
+
+
+
+
 
 
 
@@ -1658,3 +1666,181 @@ cron:
 **************<<************************>>*****************
 *******《 网关1 》***********************《 网关2 》********
 ```
+
+
+
+
+
+
+---
+<h2 id="07.1">07.1 日志中心讲解</h2>
+
+---
+
+### 日志存储调用
+
+由于日志采用了RabbitMQ的方式来创建，可以在日志服务宕机重启后，继续消费队列中存在的消息做相应的处理。   
+cloud-service\log-center\pom.xml
+```
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+```
+
+cloud-service\log-center\src\main\java\com\cloud\log\consumer\LogConsumer.java
+```
+/** 从mq队列消费日志数据 */
+@Component
+@RabbitListener(queues = LogQueue.LOG_QUEUE) // 监听队列
+public class LogConsumer {
+	private static final Logger logger = LoggerFactory.getLogger(LogConsumer.class);
+	@Autowired
+	private LogService logService;
+
+	/**  处理消息 */
+	@RabbitHandler
+	public void logHandler(Log log) {
+		try {
+			logService.save(log);
+		} catch (Exception e) {
+			logger.error("保存日志失败，日志：{}，异常：{}", log, e);
+		}
+	}
+}
+```
+
+**注意**：消费mq时，尽量加上异常处理，否则出现异常时可能导致消息没法消费，日志不断扩大。
+
+同时 log-center 也提供了接口（feign），可以调用接口来存储日志   
+cloud-service\log-center\src\main\java\com\cloud\log\controller\LogController.java
+```
+@RestController
+public class LogController {
+
+	@Autowired
+	private LogService logService;
+
+	@PostMapping("/logs-anon/internal")
+	public void save(@RequestBody Log log) {
+		logService.save(log);
+	}
+	// ......
+```
+
+日志的存储是要实现下面接口
+```
+public interface LogService {
+	/** 保存日志 */
+	void save(Log log);
+	Page<Log> findLogs(Map<String, Object> params);
+}
+```
+
+* 存储到 Mysql ，LogServiceImpl.java
+* 存储到 elasticsearch ，EsLogServiceImpl.java
+
+日志表 t_log 对应代码里面的对象   
+cloud-service\api-model\src\main\java\com\cloud\model\log\Log.java
+```
+/** 日志对象 */
+@Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Log implements Serializable {
+	private static final long serialVersionUID = -5398795297842978376L;
+	private Long id;
+	private String username;// 用户名
+	private String module;// 模块
+	private String params;// 参数值
+	private String remark;// 备注
+	private Boolean flag;// 是否执行成功
+	private Date createTime;
+}
+```
+
+### 配置文件
+
+cloud-service\log-center\src\main\java\com\cloud\log\config\AsycTaskExecutorConfig.java
+```
+/** 线程池配置、启用异步 */
+@EnableAsync(proxyTargetClass = true)
+@Configuration
+public class AsycTaskExecutorConfig {
+	@Bean
+	public TaskExecutor taskExecutor() {
+		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+		taskExecutor.setCorePoolSize(50);
+		taskExecutor.setMaxPoolSize(100);
+
+		return taskExecutor;
+	}
+}
+```
+
+cloud-service\log-center\src\main\java\com\cloud\log\config\RabbitmqConfig.java
+```
+/**  rabbitmq配置 */
+@Configuration
+public class RabbitmqConfig {
+
+	/**  声明队列 */
+	@Bean
+	public Queue logQueue() {
+		Queue queue = new Queue(LogQueue.LOG_QUEUE);
+		return queue;
+	}
+}
+```
+
+cloud-service\log-center\src\main\java\com\cloud\log\config\ElasticSearchConfig.java
+```
+@Getter
+@Setter
+@Configuration
+@ConfigurationProperties(prefix = "elasticsearch")
+public class ElasticSearchConfig {
+```
+
+cloud-service\log-center\src\main\java\com\cloud\log\config\ResourceServerConfig.java
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable().exceptionHandling()
+				.authenticationEntryPoint(
+						(request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+				.and().authorizeRequests().antMatchers(PermitAllUrl.permitAllUrl("/logs-anon/**")).permitAll() // 放开权限的url
+				.anyRequest().authenticated().and().httpBasic();
+	}
+}
+```
+不允许其他连接通过网关访问，只允许内部服务之间相互调用
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
