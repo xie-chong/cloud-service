@@ -1839,7 +1839,7 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 **怎么通过消息把日志发送到日志中心去？**
 
-基于自定义注解**@LogAnnotation**，通过aop的方式拦截请求，获取module以及params。
+基于自定义注解 **@LogAnnotation**，通过aop的方式拦截请求，获取module以及params。
 
 
 cloud-service\api-model\src\main\java\com\cloud\model\log\LogAnnotation.java
@@ -1908,7 +1908,7 @@ public class FileController {
 
 **aop 方式写成一个log-starter，抽离抽来作为一个组件**
 
-当需要做日志记录时，只需要引入依赖。在需要记录日志的方法上写上注解**@LogAnnotation**。参考用户中心。   
+当需要做日志记录时，只需要引入依赖。在需要记录日志的方法上写上注解 **@LogAnnotation**。参考用户中心。   
 
 cloud-service\user-center\pom.xml
 ```
