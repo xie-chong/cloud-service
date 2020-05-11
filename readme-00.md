@@ -14,7 +14,7 @@
 - [06.1 网关 zuul](#06.1)   
 - [06.2 网关端口说明](#06.2)   
 - [07.1 日志中心讲解](#07.1)   
-
+- [07.2 日志组件 aop 实现](#07.2)   
 
 
 
@@ -1830,6 +1830,177 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 
 
 
+
+
+---
+<h2 id="07.2">07.2 日志组件 aop 实现</h2>
+
+---
+
+**怎么通过消息把日志发送到日志中心去？**
+
+基于自定义注解**@LogAnnotation**，通过aop的方式拦截请求，获取module以及params。
+
+
+cloud-service\api-model\src\main\java\com\cloud\model\log\LogAnnotation.java
+```
+@Target({ ElementType.METHOD })
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LogAnnotation {
+
+	/** 日志模块 */
+	String module();
+
+	/**
+	 * 记录参数<br>
+	 * 尽量记录普通参数类型的方法，和能序列化的对象
+	*/
+	boolean recordParam() default true;
+}
+
+```
+
+[Java自定义注解_CN](https://www.cnblogs.com/liangweiping/p/3837332.html)   
+
+
+
+cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
+```
+@Slf4j
+@RestController
+public class UserController {
+	// ......
+   /** 修改自己的个人信息 */
+    @LogAnnotation(module = "修改个人信息")
+    @PutMapping("/users/me")
+    public AppUser updateMe(@RequestBody AppUser appUser) {
+        AppUser user = AppUserUtil.getLoginAppUser();
+        appUser.setId(user.getId());
+
+        appUserService.updateAppUser(appUser);
+
+        return appUser;
+    }
+	// ......
+}
+```
+
+cloud-service\file-center\src\main\java\com\cloud\file\controller\FileController.java
+```
+@RestController
+@RequestMapping("/files")
+public class FileController {
+	@Autowired
+	private FileServiceFactory fileServiceFactory;
+	/**
+	 * 文件上传<br>
+	 * 根据fileSource选择上传方式，目前仅实现了上传到本地<br>
+	 * 如有需要可上传到第三方，如阿里云、七牛等
+	 */
+	@LogAnnotation(module = "文件上传", recordParam = false)
+	@PostMapping
+	public FileInfo upload(@RequestParam("file") MultipartFile file, String fileSource) throws Exception {
+		FileService fileService = fileServiceFactory.getFileService(fileSource);
+		return fileService.upload(file);
+	}
+	// ......
+```
+
+**aop 方式写成一个log-starter，抽离抽来作为一个组件**
+
+当需要做日志记录时，只需要引入依赖。在需要记录日志的方法上写上注解**@LogAnnotation**。参考用户中心。   
+
+cloud-service\user-center\pom.xml
+```
+		<dependency>
+			<groupId>com.cloud</groupId>
+			<artifactId>log-starter</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+```
+
+log-starter 是参照springBoot的自动注入来写的。
+
+cloud-service\log-starter\pom.xml
+```
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>log-starter</artifactId>
+	<packaging>jar</packaging>
+
+	<parent>
+		<groupId>com.cloud</groupId>
+		<artifactId>cloud-service</artifactId>
+		<version>2.0</version>
+	</parent>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.cloud</groupId>
+			<artifactId>commons</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+	</dependencies>
+
+</project>
+```
+
+
+springBoot的自动配置大部分归功于 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+
+比如用户中心启动时的包为 ```package com.cloud.user;```，并扫不到 log-starter 下面的包```com.cloud.log.autoconfigure```。于是我们参照springBoot自动注入的原理，创建一个文件，在启动时把里面配置的内容加载成一个bean。
+
+cloud-service\log-starter\src\main\resources\META-INF\spring.factories
+```
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.cloud.log.autoconfigure.LogAutoConfiguration,\
+com.cloud.log.autoconfigure.LogAop
+```
+
+以防万一的队列声明   
+cloud-service\log-starter\src\main\java\com\cloud\log\autoconfigure\LogAutoConfiguration.java
+```
+@Configuration
+public class LogAutoConfiguration {
+
+    /**
+     * 声明队列<br>
+     * 如果日志系统已启动，或者mq上已存在队列 LogQueue.LOG_QUEUE，此处不用声明此队列<br>
+     * 此处声明只是为了防止日志系统启动前，并且没有队列 LogQueue.LOG_QUEUE的情况下丢失消息
+     *
+     * @return
+     */
+	     @Bean
+    public Queue logQueue() {
+        return new Queue(LogQueue.LOG_QUEUE);
+    }
+	// ......
+```
+
+cloud-service\log-starter\src\main\java\com\cloud\log\autoconfigure\LogAop.java
+```
+/** aop实现日志 */
+@Aspect
+public class LogAop {
+
+    private static final Logger logger = LoggerFactory.getLogger(LogAop.class);
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
+
+    /** 环绕带注解 @LogAnnotation的方法做aop */
+    @Around(value = "@annotation(com.cloud.model.log.LogAnnotation)")
+    public Object logSave(ProceedingJoinPoint joinPoint) throws Throwable {
+```
 
 
 
