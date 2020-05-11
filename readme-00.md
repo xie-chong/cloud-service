@@ -1111,7 +1111,7 @@ public OAuth2Authentication loadAuthentication(String accessTokenValue) throws A
 
 [UML-05-8](https://github.com/xie-chong/cloud-service/issues/7)
 
-比如用户中心也有注解**@EnableResourceServer**，其中的filter将会把access_token解析出来，关键的区别在于
+比如用户中心也有注解 **@EnableResourceServer**，其中的filter将会把access_token解析出来，关键的区别在于
 * 认证中心使用的是 org\springframework\security\oauth2\provider\token\DefaultTokenServices.class
 * 别的微服务使用的是 org\springframework\boot\autoconfigure\security\oauth2\resource\UserInfoTokenServices.class
 
@@ -1128,7 +1128,7 @@ public class OAuth2AuthenticationManager implements AuthenticationManager, Initi
             // ......
 ```
 
-**user-info-uri原理 **是在授权服务器认证后将认证信息Principal通过形参绑定的方法通过URL的方式获取用户信息。换句话说，就是当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
+**user-info-uri原理** 是在授权服务器认证后将认证信息Principal通过形参绑定的方法通过URL的方式获取用户信息。换句话说，就是当有了 access_token 之后，就会根据配置的 security 地址 + access_token ，发起请求到认证中心获取当前登录用户信息(```this.getMap(this.userInfoEndpointUrl, accessToken)```)。
 
 cloud-service\config-center\src\main\resources\configs\dev\user-center.yml
 ```
@@ -1508,7 +1508,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 }
 ```
 
-关于**@EnableOAuth2Sso**可以自行查看相关文档https://www.cnblogs.com/trust-freedom/p/12002089.html
+关于 **@EnableOAuth2Sso**可以自行查看相关文档https://www.cnblogs.com/trust-freedom/p/12002089.html
 
 ### feign
 
