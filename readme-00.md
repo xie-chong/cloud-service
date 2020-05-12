@@ -15,7 +15,7 @@
 - [06.2 网关端口说明](#06.2)   
 - [07.1 日志中心讲解](#07.1)   
 - [07.2 日志组件 aop 实现](#07.2)   
-
+- [07.3 日志存储到 elasticsearch](#07.3)   
 
 
 
@@ -2012,6 +2012,174 @@ public class LogAop {
 
 
 
+---
+<h2 id="07.3">07.3 日志存储到 elasticsearch</h2>
+
+---
+
+>Elasticsearch使用Lucene，并试图通过JSON和Java API提供其所有特性。它支持facetting和percolating，如果新文档与注册查询匹配，这对于通知非常有用。另一个特性称为“网关”，处理索引的长期持久性；例如，在服务器崩溃的情况下，可以从网关恢复索引。Elasticsearch支持实时GET请求，适合作为NoSQL数据存储，但缺少分布式事务。
+>
+>Elasticsearch是与名为Logstash的数据收集和日志解析引擎以及名为Kibana的分析和可视化平台一起开发的。这三个产品被设计成一个集成解决方案，称为“Elastic Stack”（以前称为“ELK stack”）。
+
+
+elasticsearch web访问的端口好是9200，http://localhost:9200，java 端访问的端口号是9300。
+
+cloud-service\config-center\src\main\resources\configs\dev\log-center.yml
+```
+elasticsearch:
+  clusterName: elasticsearch
+  clusterNodes: 127.0.0.1:9300
+```
+
+若是多个节点，使用逗号分开```clusterNodes: 127.0.0.1:9300,127.0.0.1:9301```
+
+cloud-service\log-center\src\main\java\com\cloud\log\config\ElasticSearchConfig.java
+```
+@Getter
+@Setter
+@Configuration
+@ConfigurationProperties(prefix = "elasticsearch")
+public class ElasticSearchConfig {
+
+	private String clusterName;
+	private String clusterNodes;
+
+    /** 使用elasticsearch实现类时才触发 */
+	@Bean
+    @ConditionalOnBean(value = EsLogServiceImpl.class)
+	public TransportClient getESClient() {
+		// 设置集群名字
+		Settings settings = Settings.builder().put("cluster.name", this.clusterName).build();
+		TransportClient client = new PreBuiltTransportClient(settings);
+		try {
+			// 读取的ip列表是以逗号分隔的
+			for (String clusterNode : this.clusterNodes.split(",")) {
+				String ip = clusterNode.split(":")[0];
+				String port = clusterNode.split(":")[1];
+				((TransportClient) client)
+						.addTransportAddress(new TransportAddress(InetAddress.getByName(ip), Integer.parseInt(port)));
+			}
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+		return client;
+	}
+}
+```
+
+cloud-service\log-center\pom.xml
+```
+		<dependency>
+			<groupId>org.elasticsearch</groupId>
+			<artifactId>elasticsearch</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.elasticsearch.client</groupId>
+			<artifactId>transport</artifactId>
+		</dependency>
+```
+
+**怎么使用？**
+
+cloud-service\log-center\src\main\java\com\cloud\log\service\impl\EsLogServiceImpl.java
+```
+/** 日志存储到elasticsearch实现 */
+@Service
+public class EsLogServiceImpl implements LogService, ApplicationContextAware {
+
+	private static final Logger logger = LoggerFactory.getLogger(EsLogServiceImpl.class);
+
+	private static final String INDEX = "index_logs";
+	private static final String TYPE = "type_logs";
+
+	@Autowired
+	private TransportClient client;
+	// ......
+```
+
+由于我们目前默认使用的是把日志存储到数据库   
+cloud-service\log-center\src\main\java\com\cloud\log\service\impl\LogServiceImpl.java
+```
+/**
+ * 日志存储到mysql实现
+ */
+@Primary
+@Service
+public class LogServiceImpl implements LogService {
+```
+
+若我们需要**采用 elasticsearch** ，可以修改注解，
+```
+/**
+ * 日志存储到mysql实现
+ */
+//@Primary
+//@Service
+public class LogServiceImpl implements LogService {
+```
+
+```
+/**
+ * 日志存储到elasticsearch实现
+ */
+@Service
+public class EsLogServiceImpl implements LogService, ApplicationContextAware {
+```
+
+或者
+
+```
+/**
+ * 日志存储到mysql实现
+ */
+//@Primary
+@Service
+public class LogServiceImpl implements LogService {
+```
+
+```
+/**
+ * 日志存储到elasticsearch实现
+ */
+@Primary
+@Service
+public class EsLogServiceImpl implements LogService, ApplicationContextAware {
+```
+
+elasticsearch 可以类似理解为一个数据库。   
+cloud-service\log-center\src\main\java\com\cloud\log\service\impl\EsLogServiceImpl.java
+```
+/** 日志存储到elasticsearch实现 */
+@Service
+public class EsLogServiceImpl implements LogService, ApplicationContextAware {
+
+	// ......
+	private static final String INDEX = "index_logs";// 可以理解为库名
+	private static final String TYPE = "type_logs";// 可以理解为表名
+
+	@Autowired
+	private TransportClient client;
+	// ......
+
+	private static ApplicationContext applicationContext = null;
+	// 把spring上下文注入到其中
+	@Override
+	public void setApplicationContext(ApplicationContext context) throws BeansException {
+		applicationContext = context;
+	}
+
+	/** 初始化日志es索引，相当于创建数据库 */
+	@PostConstruct// 系统启动的时候加载
+	public void initIndex() {
+		LogService logService = applicationContext.getBean(LogService.class);
+		// 日志实现是否采用elasticsearch
+		boolean flag = (logService instanceof EsLogServiceImpl);
+		if (!flag) {
+			return;
+		}
+
+	// ......
+```
 
 
 
