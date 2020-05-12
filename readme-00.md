@@ -2181,5 +2181,6 @@ public class EsLogServiceImpl implements LogService, ApplicationContextAware {
 	// ......
 ```
 
+**提示**：Logstash 和 Kibana 的整合未完成。即重写文档《elk环境搭建》--readme-04.md
 
 
