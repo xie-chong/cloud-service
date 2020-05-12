@@ -16,7 +16,7 @@
 - [07.1 日志中心讲解](#07.1)   
 - [07.2 日志组件 aop 实现](#07.2)   
 - [07.3 日志存储到 elasticsearch](#07.3)   
-
+- [08.1 监控中心](#08.1)   
 
 
 
@@ -2183,4 +2183,98 @@ public class EsLogServiceImpl implements LogService, ApplicationContextAware {
 
 **提示**：Logstash 和 Kibana 的整合未完成。即重写文档《elk环境搭建》--readme-04.md
 
+
+
+
+
+
+
+
+
+
+---
+<h2 id="08.1">08.1 监控中心</h2>
+
+---
+
+主要使用的是 spring-boot-admin ，它通过注册中心，监控别的微服务。
+
+cloud-service\monitor-center\pom.xml
+```
+        <dependency>
+            <groupId>de.codecentric</groupId>
+            <artifactId>spring-boot-admin-starter-server</artifactId>
+            <version>${monitor.version}</version>
+        </dependency>
+```
+
+cloud-service\monitor-center\src\main\java\com\admin\cloud\monitor\MonitorApplication.java
+```
+/** 监控中心 */
+@EnableAdminServer
+@EnableDiscoveryClient
+@SpringBootApplication
+public class MonitorApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MonitorApplication.class, args);
+    }
+}
+```
+
+可以直接访问http://localhost:9001   
+cloud-service\monitor-center\src\main\resources\bootstrap.yml
+
+```
+spring:
+  application:
+    name: monitor-server
+server:
+  port: 9001
+```
+
+页面显示各个微服务的信息
+
+| Details | Log | Metrics | Environment | Logging | Threads | Audit | Trace | Heapdump |
+| :----: | :---- | :---- | :----: | :----: | :----: | :----: | :----: | :----: |
+| ---- | 日志文件输出 | 接口调用的情况，主要用来做统计 | ---- | 日志级别 | 线程相关的形象 | ---- | ---- | ---- |
+
+* log 对应日志中心配置的日志文件输出，如果没有配置，那么就不会有该tab（比如配置中心就没有配置）
+```
+logging:
+  level:
+    root: info
+    com.cloud: debug
+  file: logs/${spring.application.name}.log
+```
+
+各个被监控的微服务会在配置文件中配置如下信息（但该方式已经被弃用deprecated）
+```
+management:
+  security:
+    enabled: false # 为true则表示监控中心没有权限监控该微服务
+```
+
+由于有的微服务是作为资源服务器，所以会有一些拦截，我们需要放开与监控相关的url   
+cloud-service\commons\src\main\java\com\cloud\common\constants\PermitAllUrl.java
+```
+/** 需要放开权限的url */
+public final class PermitAllUrl {
+
+    /**  监控中心和swagger需要访问的url */
+    private static final String[] ENDPOINTS = {"/actuator/health", "/actuator/env", "/actuator/metrics/**", "/actuator/trace", "/actuator/dump",
+            "/actuator/jolokia", "/actuator/info", "/actuator/logfile", "/actuator/refresh", "/actuator/flyway", "/actuator/liquibase",
+            "/actuator/heapdump", "/actuator/loggers", "/actuator/auditevents", "/actuator/env/PID", "/actuator/jolokia/**",
+            "/v2/api-docs/**", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**"};
+
+    /**
+     * 需要放开权限的url
+     *
+     * @param urls 自定义的url
+     * @return 自定义的url和监控中心需要访问的url集合
+     */
+    public static String[] permitAllUrl(String... urls) {
+
+	// ......
+```
 
