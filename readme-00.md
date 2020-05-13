@@ -17,7 +17,7 @@
 - [07.2 日志组件 aop 实现](#07.2)   
 - [07.3 日志存储到 elasticsearch](#07.3)   
 - [08.1 监控中心](#08.1)   
-
+- [09.1 文件中心](#09.1)   
 
 
 
@@ -2277,4 +2277,103 @@ public final class PermitAllUrl {
 
 	// ......
 ```
+
+
+
+
+
+
+
+
+
+---
+<h2 id="09.1">09.1 文件中心</h2>
+
+---
+
+[UML-09-1](https://github.com/xie-chong/cloud-service/issues/9)
+
+自定义配置，日志文件存储到磁盘（已经弃用）   
+cloud-service\config-center\src\main\resources\configs\dev\log-center.yml
+```
+file:
+  local:
+    path: D:/localFile
+    prefix: /statics
+    urlPrefix: http://api.gateway.com:8080/api-f${file.local.prefix}
+```
+**访问时url**：http://api.gateway.com:8080/api-f/statics/具体文件路径（不包含D:/localFile）+文件名称
+比如某个文件的存储位置为 D:/localFile/2020/05/13/abc.txt，那么访问路径就为http://api.gateway.com:8080/api-f/statics/2020/05/13/abc.txt
+
+启动类也很常规   
+cloud-service\file-center\src\main\java\com\cloud\file\FileCenterApplication.java
+```
+/** 文件中心 */
+@EnableDiscoveryClient
+@SpringBootApplication
+public class FileCenterApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(FileCenterApplication.class, args);
+	}
+}
+```
+
+文件中心同时也作为一个资源服务器，需要放开一些访问权限   
+cloud-service\file-center\src\main\java\com\cloud\file\config\ResourceServerConfig.java
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+	/**  url前缀 */
+	@Value("${file.local.prefix}")
+	public String localFilePrefix;
+
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable().exceptionHandling()
+				.authenticationEntryPoint(
+						(request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+				.and().authorizeRequests()
+				.antMatchers(PermitAllUrl.permitAllUrl("/files-anon/**", localFilePrefix + "/**")).permitAll() // 放开权限的url
+				.anyRequest().authenticated().and().httpBasic();
+	}
+}
+```
+
+因为springBoot项目一般都是生成jar包的，所以涉及到文件的上传下载不可能把文件放到jar里面，我们会根据配置文件把文件映射到别的目录下。   
+cloud-service\file-center\src\main\java\com\cloud\file\config\LocalFilePathConfig.java
+```
+/** 使系统加载jar包外的文件 */
+@Configuration
+public class LocalFilePathConfig {
+
+	/** 上传文件存储在本地的根路径 */
+	@Value("${file.local.path}")
+	private String localFilePath;
+
+	/**  url前缀 */
+	@Value("${file.local.prefix}")
+	public String localFilePrefix;
+
+	@Bean
+	public WebMvcConfigurer webMvcConfigurerAdapter() {
+		return new WebMvcConfigurer() {
+
+			/** 外部文件访问 */
+			@Override
+			public void addResourceHandlers(ResourceHandlerRegistry registry) {
+				registry.addResourceHandler(localFilePrefix + "/**")
+						.addResourceLocations(ResourceUtils.FILE_URL_PREFIX + localFilePath + File.separator);
+			}
+		};
+	}
+}
+```
+
+
+
 
