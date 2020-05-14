@@ -2301,12 +2301,6 @@ file:
     path: D:/localFile
     prefix: /statics
     urlPrefix: http://api.gateway.com:8080/api-f${file.local.prefix}
-  aliyun:
-    endpoint: xxx
-    accessKeyId: xxx
-    accessKeySecret: xxx
-    bucketName: xxx
-    domain: https://xxx
 ```
 **访问时url**：http://api.gateway.com:8080/api-f/statics/具体文件路径（不包含D:/localFile）+文件名称
 比如某个文件的存储位置为 D:/localFile/2020/05/13/abc.txt，那么访问路径就为http://api.gateway.com:8080/api-f/statics/2020/05/13/abc.txt
