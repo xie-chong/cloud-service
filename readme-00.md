@@ -2293,14 +2293,20 @@ public final class PermitAllUrl {
 
 [UML-09-1](https://github.com/xie-chong/cloud-service/issues/9)
 
-自定义配置，日志文件存储到磁盘（已经弃用）   
-cloud-service\config-center\src\main\resources\configs\dev\log-center.yml
+自定义配置，日志文件存储到磁盘   
+cloud-service\config-center\src\main\resources\configs\dev\file-center.yml
 ```
 file:
   local:
     path: D:/localFile
     prefix: /statics
     urlPrefix: http://api.gateway.com:8080/api-f${file.local.prefix}
+  aliyun:
+    endpoint: xxx
+    accessKeyId: xxx
+    accessKeySecret: xxx
+    bucketName: xxx
+    domain: https://xxx
 ```
 **访问时url**：http://api.gateway.com:8080/api-f/statics/具体文件路径（不包含D:/localFile）+文件名称
 比如某个文件的存储位置为 D:/localFile/2020/05/13/abc.txt，那么访问路径就为http://api.gateway.com:8080/api-f/statics/2020/05/13/abc.txt
