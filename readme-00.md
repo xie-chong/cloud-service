@@ -18,7 +18,7 @@
 - [07.3 日志存储到 elasticsearch](#07.3)   
 - [08.1 监控中心](#08.1)   
 - [09.1 文件中心](#09.1)   
-
+- [09.2 阿里云-文件上传](#09.2)  
 
 
 
@@ -2377,3 +2377,143 @@ public class LocalFilePathConfig {
 
 
 
+
+
+
+
+
+---
+<h2 id="09.2">09.2 阿里云-文件上传</h2>
+
+---
+
+### 配置
+
+根据阿里云的对象存储 OOS 配置相关的参数。   
+1. 访问域名-外网访问
+
+| Endpoint | 访问域名 | https |
+| :----: | :---- | :---- |
+| xxx | xxx | 支持 |
+
+2. accessKey管理
+
+| Access Key ID | Access Key Secret | 状态 | 创建时间 | 操作 |
+| :----: | :---- | :---- | :---- | :---- |
+| xxx | [显示]()| 启用 | xxx | 禁用/删除 |
+
+cloud-service\config-center\src\main\resources\configs\dev\file-center.yml
+```
+file:
+  local:
+    path: D:/localFile
+    prefix: /statics
+    urlPrefix: http://api.gateway.com:8080/api-f${file.local.prefix}
+  aliyun:
+    endpoint: xxx
+    accessKeyId: xxx
+    accessKeySecret: xxx
+    bucketName: xxx
+    domain: https://xxx
+```
+
+[对象存储 OOS 文档](https://help.aliyun.com/product/31815.html?spm=a2c4g.750001.list.24.5f5f7b13oGm8b1)
+
+在 Maven 工程中使用 OSS Java SDK，只需在 pom.xml 中加入相应依赖即可。以 3.8.0 版本为例，在 <dependencies> 内加入如下内容：   
+```
+<dependency>
+    <groupId>com.aliyun.oss</groupId>
+    <artifactId>aliyun-sdk-oss</artifactId>
+    <version>3.8.0</version>
+</dependency>
+```
+
+**上传文件流**
+
+```
+// Endpoint以杭州为例，其它Region请按实际情况填写。
+String endpoint = "http://oss-cn-hangzhou.aliyuncs.com";
+// 云账号AccessKey有所有API访问权限，建议遵循阿里云安全最佳实践，创建并使用RAM子账号进行API访问或日常运维，请登录 https://ram.console.aliyun.com 创建。
+String accessKeyId = "<yourAccessKeyId>";
+String accessKeySecret = "<yourAccessKeySecret>";
+
+// 创建OSSClient实例。
+OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+// 上传文件流。
+InputStream inputStream = new FileInputStream("<yourlocalFile>");
+ossClient.putObject("<yourBucketName>", "<yourObjectName>", inputStream);
+
+// 关闭OSSClient。
+ossClient.shutdown();
+```
+
+cloud-service\file-center\src\main\java\com\cloud\file\config\AliyunConfig.java
+```
+/** 阿里云配置 */
+@Configuration
+public class AliyunConfig {
+
+	@Value("${file.aliyun.endpoint}")
+	private String endpoint;
+	@Value("${file.aliyun.accessKeyId}")
+	private String accessKeyId;
+	@Value("${file.aliyun.accessKeySecret}")
+	private String accessKeySecret;
+
+	/**  阿里云文件存储client */
+	@Bean
+	public OSSClient ossClient() {
+		OSSClient ossClient = new OSSClient(endpoint, accessKeyId, accessKeySecret);
+		return ossClient;
+	}
+}
+```
+
+cloud-service\file-center\src\main\java\com\cloud\file\service\impl\AliyunFileServiceImpl.java
+```
+/** 阿里云存储文件 */
+@Service("aliyunFileServiceImpl")
+public class AliyunFileServiceImpl extends AbstractFileService {
+
+	@Autowired
+	private FileDao fileDao;
+
+	@Override
+	protected FileDao getFileDao() {
+		return fileDao;
+	}
+
+	@Override
+	protected FileSource fileSource() {
+		return FileSource.ALIYUN;
+	}
+
+	@Autowired
+	private OSSClient ossClient;
+
+	@Value("${file.aliyun.bucketName}")
+	private String bucketName;
+	@Value("${file.aliyun.domain}")
+	private String domain;
+
+	@Override
+	protected void uploadFile(MultipartFile file, FileInfo fileInfo) throws Exception {
+		ossClient.putObject(bucketName, fileInfo.getName(), file.getInputStream());
+		fileInfo.setUrl(domain + "/" + fileInfo.getName());
+	}
+
+	@Override
+	protected boolean deleteFile(FileInfo fileInfo) {
+		ossClient.deleteObject(bucketName, fileInfo.getName());
+		return true;
+	}
+}
+```
+
+文件上传之后产生的访问url：https://domian/yourObjectName   
+即```Info.setUrl(domain + "/" + fileInfo.getName());```
+
+当我们上传文件的时候，代码先执行接口 FileService.java 的实现类 AbstractFileService.java （upload()方法），最终根据文件上传的类型，选择具体的实现类 AliyunFileServiceImpl.java、LocalFileServiceImpl.java（uploadFile（）方法） 执行具体的上传逻辑。
+
+**值得借鉴**： 将文件的md5设置为文件表的id，后续可对此做出判断文件是否存在等操作。
