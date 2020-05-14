@@ -19,7 +19,7 @@
 - [08.1 监控中心](#08.1)   
 - [09.1 文件中心](#09.1)   
 - [09.2 阿里云-文件上传](#09.2)  
-
+- [10.1 后台管理配置类和消息处理](#10.1)  
 
 
 
@@ -2517,3 +2517,213 @@ public class AliyunFileServiceImpl extends AbstractFileService {
 当我们上传文件的时候，代码先执行接口 FileService.java 的实现类 AbstractFileService.java （upload()方法），最终根据文件上传的类型，选择具体的实现类 AliyunFileServiceImpl.java、LocalFileServiceImpl.java（uploadFile（）方法） 执行具体的上传逻辑。
 
 **值得借鉴**： 将文件的md5设置为文件表的id，后续可对此做出判断文件是否存在等操作。
+
+
+
+
+
+
+
+
+
+
+
+---
+<h2 id="10.1">10.1 后台管理配置类和消息处理</h2>
+
+---
+
+### mail
+
+springBoot 把resources/static/下面的内容当作静态资源来处理。可以单独分离出来部署。
+
+使用了spring mail   
+cloud-service\manage-backend\pom.xml
+```
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+```
+
+cloud-service\config-center\src\main\resources\configs\dev\manage-backend.yml
+```
+spring:
+  mail:
+    default-encoding: UTF-8
+    host: smtp.163.com
+    username:
+    password:
+    protocol: smtp
+    test-connection: false
+#    properties:
+#      mail.smtp.auth: true
+```
+
+username、password 为空，启动的时候不会报错，若配置错误，则启动会报错(535)，不影响系统启动，只影响邮件功能。
+
+* username: 163邮箱账户
+* password: 不是163邮箱登陆密码，需要开通一个smtp授权密码
+
+### RabbitMQ delete role
+
+用户中心有角色表 sys_role，后台管理有角色与菜单的对应关系表 role_menu 。角色就冗余到两个系统里面。所以需要 RabbitMQ 来关联处理相应的逻辑。当用户中心删除角色，发出mq消息，后台管理消费队列消息，并做相应的处理。
+
+cloud-service\manage-backend\src\main\java\com\cloud\backend\config\RabbitmqConfig.java
+```
+/** rabbitmq配置 */
+@Configuration
+public class RabbitmqConfig {
+
+	/** 角色删除队列名 */
+	public static final String ROLE_DELETE_QUEUE = "role.delete.queue";
+
+	/** 声明队列，此队列用来接收角色删除的消息 */
+	@Bean
+	public Queue roleDeleteQueue() {
+		Queue queue = new Queue(ROLE_DELETE_QUEUE);
+		return queue;
+	}
+
+	@Bean
+	public TopicExchange userTopicExchange() {
+		return new TopicExchange(UserCenterMq.MQ_EXCHANGE_USER);
+	}
+
+	/** 将角色删除队列和用户的exchange做个绑定 */
+	@Bean
+	public Binding bindingRoleDelete() {
+		Binding binding = BindingBuilder.bind(roleDeleteQueue()).to(userTopicExchange())
+				.with(UserCenterMq.ROUTING_KEY_ROLE_DELETE);
+		return binding;
+	}
+}
+```
+
+cloud-service\user-center\src\main\java\com\cloud\user\service\impl\SysRoleServiceImpl.java
+```
+@Slf4j
+@Service
+public class SysRoleServiceImpl implements SysRoleService {
+
+	// ......
+	@Transactional
+	@Override
+	public void deleteRole(Long id) {
+		SysRole sysRole = sysRoleDao.findById(id);
+
+		sysRoleDao.delete(id);
+		rolePermissionDao.deleteRolePermission(id, null);
+		userRoleDao.deleteUserRole(null, id);
+
+		log.info("删除角色：{}", sysRole);
+
+		// 发布role删除的消息
+		amqpTemplate.convertAndSend(UserCenterMq.MQ_EXCHANGE_USER, UserCenterMq.ROUTING_KEY_ROLE_DELETE, id);
+	}
+
+	// ......
+}
+```
+
+cloud-service\manage-backend\src\main\java\com\cloud\backend\consumer\RoleDeleteConsumer.java
+```
+/** 删除角色时，处理消息 */
+@Slf4j
+@Component
+@RabbitListener(queues = RabbitmqConfig.ROLE_DELETE_QUEUE)
+public class RoleDeleteConsumer {
+
+	@Autowired
+	private RoleMenuDao roleMenuDao;
+
+	/**
+	 * 接收到删除角色的消息<br>
+	 * 删除角色和菜单关系
+	 */
+	@RabbitHandler
+	public void roleDeleteHandler(Long roleId) {
+		log.info("接收到删除角色的消息,roleId:{}", roleId);
+		try {
+			roleMenuDao.delete(roleId, null);
+		} catch (Exception e) {
+			log.error("角色删除消息处理异常", e);
+		}
+	}
+}
+```
+
+
+### ResourceServerConfig
+
+管理后台和前端页面在一个项目里面，所以对应的访问连接需要放开相应的权限。   
+cloud-service\manage-backend\src\main\java\com\cloud\backend\config\ResourceServerConfig.java
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http.csrf().disable().exceptionHandling()
+                .authenticationEntryPoint(
+                        (request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+                .and().authorizeRequests()
+                .antMatchers(PermitAllUrl.permitAllUrl("/backend-anon/**", "/favicon.ico", "/css/**", "/js/**",
+                        "/fonts/**", "/layui/**", "/img/**", "/pages/**", "/pages/**/*.html", "/*.html")).permitAll() // 放开权限的url
+                .anyRequest().authenticated().and().httpBasic();
+
+        http.headers().frameOptions().sameOrigin();
+    }
+}
+```
+### feign 与 access_token
+
+管理后台访问别的服务的接口时，可能需要access_token，为了方便，我们统一做一个拦截来处理。   
+cloud-service\manage-backend\src\main\java\com\cloud\backend\config\FeignInterceptorConfig.java
+```
+/**
+ * 使用feign client访问别的微服务时，将access_token放入参数或者header<br>
+ * 任选其一即可，<br>
+ * 如token为xxx<br>
+ * 参数形式就是access_token=xxx<br>
+ * header的话，是Authorization:Bearer xxx<br>
+ * 我们默认放在header里
+ */
+@Configuration
+public class FeignInterceptorConfig {
+
+	@Bean
+	public RequestInterceptor requestInterceptor() {
+		RequestInterceptor requestInterceptor = new RequestInterceptor() {
+
+			@Override
+			public void apply(RequestTemplate template) {
+				Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+				if (authentication != null) {
+					if (authentication instanceof OAuth2Authentication) {
+						OAuth2AuthenticationDetails details = (OAuth2AuthenticationDetails) authentication.getDetails();
+						String access_token = details.getTokenValue();
+
+						template.header("Authorization", OAuth2AccessToken.BEARER_TYPE + " " + access_token);
+//						template.query(OAuth2AccessToken.ACCESS_TOKEN, access_token);
+					}
+				}
+			}
+		};
+		return requestInterceptor;
+	}
+}
+```
+
+
+
+
+
+
+
+
+
+
