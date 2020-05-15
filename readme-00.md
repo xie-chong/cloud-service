@@ -24,7 +24,7 @@
 - [11.1 后台登陆页面](#11.1)  
 - [11.2 后台主页和修改个人信息](#11.2)  
 - [11.3 后台菜单页面](#11.3)  
-
+- [11.4 后台页面按钮权限粒度控制](#11.4)  
 
 
 
@@ -3012,3 +3012,85 @@ cloud-service\manage-backend\src\main\java\com\cloud\backend\controller\MenuCont
 ```
 
 
+
+
+
+
+
+
+---
+<h2 id="11.4">11.4 后台页面按钮权限粒度控制</h2>
+
+---
+
+**数据库、页面、后台这个三个地方的权限需要保持一致，开发前约定的。**
+
+### 按钮权限
+
+后台拿到当前用户的权限，遍历页面元素，如果当前用户没有某个按钮的权限，则把该按钮隐藏。最后返回该用户拥有的权限，以便后续使用。   
+cloud-service\manage-backend\src\main\resources\static\js\my\permission.js
+```
+function checkPermission() {
+	var pers = [];
+	$.ajax({
+		type : 'get',
+		url : domainName + '/api-u/users/current',
+		contentType : "application/json; charset=utf-8",
+		async : false,
+		success : function(data) {
+			pers = data.permissions;
+			$("[permission]").each(function() {
+				var per = $(this).attr("permission");
+				if ($.inArray(per, pers) < 0) {
+					$(this).hide();
+				}
+			});
+		}
+	});
+	
+	return pers;
+}
+```
+
+### 修改和删除按钮
+
+cloud-service\manage-backend\src\main\resources\static\pages\menu\menuList.html
+```
+// ......
+var id = d['id'];
+var href = "updateMenu.html?id=" + id;
+var edit = buttonEdit(href, "back:menu:update", pers);
+var del = buttonDel(id, "back:menu:delete", pers);
+tr += "<td>"+edit + del+"</td>";
+tr += "</tr>"
+$("#dt-table").append(tr);
+// ......
+```
+
+cloud-service\manage-backend\src\main\resources\static\js\jq.js
+```
+// ......
+function buttonEdit(href, permission, pers){
+	if(permission != ""){
+		if ($.inArray(permission, pers) < 0) {
+			return "";
+		}
+	}
+	
+	var btn = $("<button class='layui-btn layui-btn-xs' title='编辑' onclick='window.location=\"" + href +"\"'><i class='layui-icon'>&#xe642;</i></button>");
+	return btn.prop("outerHTML");
+}
+
+
+function buttonDel(data, permission, pers){
+	if(permission != ""){
+		if ($.inArray(permission, pers) < 0) {
+			return "";
+		}
+	}
+	
+	var btn = $("<button class='layui-btn layui-btn-xs' title='删除' onclick='del(\"" + data +"\")'><i class='layui-icon'>&#xe640;</i></button>");
+	return btn.prop("outerHTML");
+}
+// ......
+```
