@@ -21,7 +21,7 @@
 - [09.2 阿里云-文件上传](#09.2)  
 - [10.1 后台管理配置类和消息处理](#10.1)  
 - [10.2 管理后台接口](#10.2)  
-
+- [11.1 后台登陆页面](#11.1)  
 
 
 
@@ -2747,6 +2747,128 @@ public class FeignInterceptorConfig {
 
 
 
+---
+<h2 id="11.1">11.1 后台登陆页面</h2>
+
+---
+
+前端页面的代码都在 manage-backend 项目中，也可以自行分离单独部署。
+
+cloud-service\manage-backend\src\main\resources\static\login.html
+```
+<body>
+
+	<div class="login">
+		<div class="message">后台管理系统</div>
+		<div id="darkbannerwrap"></div>
+
+		<form id="login-form" method="post" onsubmit="return false;">
+			<input id="username" name="username" placeholder="用户名" type="text"
+				autocomplete="off">
+			<hr class="hr15">
+			<input id="password" name="password" placeholder="密码" type="password"
+				autocomplete="off">
+			<hr class="hr15">
+			<button style="width: 100%;" type="submit"
+				onclick="login(this)">登录</button>
+			<hr class="hr20">
+			<a href="login-sms.html">短信登陆</a>
+			<span id="info" style="color: red"></span>
+		</form>
+	</div>
+</body>
+<script src="js/constant.js"></script>
+<script src="js/libs/jquery-3.3.1.min.js"></script>
+<script type="text/javascript">
+```
+
+cloud-service\manage-backend\src\main\resources\static\js\constant.js
+```
+// 我们这里demo是直接访问网关的，因此domainName配置的是后端java服务网关层的域名和端口，
+// 正式生产为了保证网关的高可用性，肯定是部署了多个网关服务，然后用nginx反向代理的
+// 那么多个网关服务或者生产环境的话，我们这里配置的是nginx的地址，只修改此处即可实现多环境切换
+var domainName = "http://api.gateway.com:8080";
+
+
+// 登陆页地址，未登录或过期时进行跳转，如果是前端单独部署的话-，这里请写全路径，如http://xx.xx.xx/login.html
+var loginPage = "/api-b/login.html";
+```
+
+cloud-service\manage-backend\src\main\resources\static\login.html
+```
+// ......
+<script type="text/javascript">
+	if (top != self) {
+		parent.location.href = loginPage;
+	}
+
+	// access_token存在的情况下，直接跳转到主页面
+	var access_token = localStorage.getItem("access_token");
+	if (access_token != null && access_token.trim().length != 0) {
+		$.ajax({
+			type : 'get',
+			url : domainName + '/api-u/users/current?access_token=' + access_token,
+			success : function(data) {
+				location.href = 'index.html';
+			},
+			error : function(xhr, textStatus, errorThrown) {
+				if (xhr.status == 401) {
+					localStorage.removeItem("access_token");
+				}
+			}
+		});
+	}
+
+	function login(obj) {
+		$(obj).attr("disabled", true);// 禁用登陆按钮
+
+		var username = $.trim($('#username').val());
+		var password = $.trim($('#password').val());
+		if (username == "" || password == "") {
+			$("#info").html('用户名或者密码不能为空');
+			$(obj).attr("disabled", false);
+		} else {
+			$.ajax({
+				type : 'post',
+				url : domainName + '/sys/login',
+				timeout : 5000, //超时时间设置，单位毫秒
+				data : $("#login-form").serialize(),
+				success : function(data) {
+				    //将access_token和refresh_token写入本地
+					localStorage.setItem("access_token", data.access_token);
+					localStorage.setItem("refresh_token", data.refresh_token);
+					location.href = 'index.html';
+				},
+				error : function(xhr, textStatus, errorThrown) {
+					$(obj).attr("disabled", false);
+					if(textStatus == 'timeout') {
+						$("#info").html("登陆超时,请重试");
+						return;
+					}
+					var msg = xhr.responseText;
+					if(msg == undefined){
+                        $("#info").html("请重试");
+					} else {
+                        var response = JSON.parse(msg);
+                        var message = response.error_description;
+                        if(message == undefined){
+                            message = response.message;
+                        }
+                        $("#info").html(message);
+					}
+				}
+			});
+
+		}
+	}
+</script>
+// ......
+```
+
+视频中涉及到将登陆地址存入到本地缓存，以方便非法请求时，直接跳到到登陆页面。但是目前代码中并不存在此操作。
+```
+localStorage.setItem("loginUrl", location.herf);
+```
 
 
 
