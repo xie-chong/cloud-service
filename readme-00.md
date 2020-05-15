@@ -22,7 +22,7 @@
 - [10.1 后台管理配置类和消息处理](#10.1)  
 - [10.2 管理后台接口](#10.2)  
 - [11.1 后台登陆页面](#11.1)  
-
+- [11.2 后台主页和修改个人信息](#11.2)  
 
 
 
@@ -2869,6 +2869,69 @@ cloud-service\manage-backend\src\main\resources\static\login.html
 ```
 localStorage.setItem("loginUrl", location.herf);
 ```
+
+
+
+
+
+
+
+
+
+---
+<h2 id="11.2">11.2 后台主页和修改个人信息</h2>
+
+---
+
+登陆成功之后跳转到主页面```http://localhost:8080/api-b/index.html```
+
+cloud-service\manage-backend\src\main\resources\static\index.html
+```
+// ......
+			<script src="js/constant.js"></script>
+			<script src="js/libs/jquery-3.3.1.min.js"></script>
+			<script type="text/javascript" src="js/jq.js"></script>
+			<script type="text/javascript" src="js/main.js"></script>
+// ......
+```
+* jq.js 对ajax请求做设置，其中包括设置请求头中的access_token。当我们请求某个接口时，可以不显示的色湖之参数access_oken，只需要引入jq.js即可。
+```
+$.ajaxSetup({
+	cache : false,
+	headers : {
+		"Authorization" : "Bearer " + localStorage.getItem("access_token")
+	},
+	// .....
+```
+
+反例，登陆页面没有引入jq.js，需要设置 access_oken
+```
+$.ajax({
+			type : 'get',
+			url : domainName + '/api-u/users/current?access_token=' + access_token,
+```
+
+* main.js 主要是有关于菜单的设置以及渲染（感兴趣可以着重看一下这一块）
+
+
+修改个人信息   
+cloud-service\manage-backend\src\main\resources\static\pages\user\updateMyself.html
+```
+	// ......
+	<script src="../../js/constant.js"></script>
+	<script type="text/javascript" src="../../js/libs/jquery-3.3.1.min.js"></script>
+	<script type="text/javascript" src="../../js/jq.js"></script>
+	<script type="text/javascript" src="../../js/plugin/bootstrapvalidator/bootstrapValidator.min.js"></script>
+	<script type="text/javascript" src="../../js/common.js"></script>
+	<script type="text/javascript" src="../../layui/layui.js"></script>
+	// ......
+```
+
+* bootstrapValidator.min.js 包含表单校验
+* common.js 包含form序列化为json 和 获取url后的参数值
+
+
+
 
 
 
