@@ -2883,6 +2883,8 @@ localStorage.setItem("loginUrl", location.herf);
 
 ---
 
+**主页面**
+
 登陆成功之后跳转到主页面```http://localhost:8080/api-b/index.html```
 
 cloud-service\manage-backend\src\main\resources\static\index.html
@@ -2914,7 +2916,7 @@ $.ajax({
 * main.js 主要是有关于菜单的设置以及渲染（感兴趣可以着重看一下这一块）
 
 
-修改个人信息   
+**修改个人信息**   
 cloud-service\manage-backend\src\main\resources\static\pages\user\updateMyself.html
 ```
 	// ......
