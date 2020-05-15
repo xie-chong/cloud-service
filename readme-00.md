@@ -23,6 +23,11 @@
 - [10.2 管理后台接口](#10.2)  
 - [11.1 后台登陆页面](#11.1)  
 - [11.2 后台主页和修改个人信息](#11.2)  
+- [11.3 后台菜单页面](#11.3)  
+
+
+
+
 
 
 
@@ -2936,5 +2941,74 @@ cloud-service\manage-backend\src\main\resources\static\pages\user\updateMyself.h
 
 
 
+
+
+
+
+---
+<h2 id="11.3">11.3 后台菜单页面</h2>
+
+---
+
+对应数据库 cloud_backend 里的表```SELECT * FROM menu;```
+
+| id | parentId | name | url | css | sort | createTime | updateTime |
+| :---- |:---- |:---- |:---- |:---- |:---- |:---- |:---- |
+|1|0|系统设置||fa-gears|1| | |
+|2|1|菜单|pages/menu/menuList.html|fa-windows|2| ||
+|3|1|角色|pages/role/roleList.html|fa-cubes|3|| |
+| ...... |...... |...... |...... |...... |...... |...... |...... |
+
+cloud-service\manage-backend\src\main\resources\static\pages\menu\menuList.html
+```
+// ......
+<script src="../../js/constant.js"></script>
+<script type="text/javascript" src="../../js/libs/jquery-3.3.1.min.js"></script>
+<script type="text/javascript" src="../../js/jq.js"></script>
+<script type="text/javascript" src="../../layui/layui.js"></script>
+<script type="text/javascript" src="../../js/my/permission.js"></script>
+<script src="../../js/libs/jquery.treetable.js"></script>
+<script type="text/javascript">
+// .......
+```
+
+* permission.js 返回当前登陆用户所拥有的权限
+```
+function checkPermission() {
+	var pers = [];
+	$.ajax({
+		type : 'get',
+		url : domainName + '/api-u/users/current',
+		contentType : "application/json; charset=utf-8",
+		async : false,
+		success : function(data) {
+			pers = data.permissions;
+			$("[permission]").each(function() {
+				var per = $(this).attr("permission");
+				if ($.inArray(per, pers) < 0) {
+					$(this).hide();
+				}
+			});
+		}
+	});
+	
+	return pers;
+}
+```
+
+* jquery.treetable.js
+
+涉及到菜单的遍历层级   
+cloud-service\manage-backend\src\main\java\com\cloud\backend\controller\MenuController.java
+
+**添加菜单**   
+
+```
+<td align="right">
+	<button class="layui-btn layui-btn-sm" onclick="location.href='addMenu.html'" permission="back:menu:save">
+           <i class="layui-icon">&#xe608;</i> 添加
+    </button>
+</td>
+```
 
 
