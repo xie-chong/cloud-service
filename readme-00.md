@@ -27,7 +27,7 @@
 - [11.4 后台页面按钮权限粒度控制](#11.4)  
 - [11.5 后台查询 Datatales](#11.5)  
 - [11.6 文件上传](#11.6)  
-
+- [12.1 后台页面单独部署](#12.1)  
 
 
 
@@ -3235,5 +3235,39 @@ public class FileController {
 	}
 // .......
 ```
+
+
+
+
+
+
+
+
+---
+<h2 id="12.1">12.1 后台页面单独部署</h2>
+
+---
+
+没分离之前的登陆地址 ```http://localhost:8080/api-b/login.html```
+
+
+- static
+  - css >
+  - fonts >
+  - img >
+  - js >
+  - layui >
+  - pages >
+  - index.html
+  - login.html
+  - login-sms.html
+
+**单独部署操作**：整个static目录下的文件存放到一个名为abc的文件中，再把abc放到Tomcat服务器的webapps下面，但我们启动Tomcat时，就把前端界面分离了。此时访问```http://localhost:8081/abc/login.html```。
+
+提示：记得修改 constant.js 中的域名。
+
+当然也可以不要Tomcat，使用Ngix，只要能带起前端系统即可。
+
+
 
 
