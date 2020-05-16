@@ -3262,11 +3262,11 @@ public class FileController {
   - login.html
   - login-sms.html
 
-**单独部署操作**：整个static目录下的文件存放到一个名为abc的文件中，再把abc放到Tomcat服务器的webapps下面，但我们启动Tomcat时，就把前端界面分离了。此时访问```http://localhost:8081/abc/login.html```。
+**单独部署操作**：整个static目录下的文件存放到一个名为abc的文件中，再把abc放到Tomcat服务器的webapps下面，当我们启动Tomcat时，就把前端界面分离了。此时访问```http://localhost:8081/abc/login.html```。
 
 提示：记得修改 constant.js 中的域名。
 
-当然也可以不要Tomcat，使用Ngix，只要能带起前端系统即可。
+当然也可以不要Tomcat，使用Nginx，只要能带起前端系统即可。
 
 
 
