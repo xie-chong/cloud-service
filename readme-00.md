@@ -25,7 +25,7 @@
 - [11.2 后台主页和修改个人信息](#11.2)  
 - [11.3 后台菜单页面](#11.3)  
 - [11.4 后台页面按钮权限粒度控制](#11.4)  
-
+- [11.5 后台查询 Datatales](#11.5)  
 
 
 
@@ -3094,3 +3094,43 @@ function buttonDel(data, permission, pers){
 }
 // ......
 ```
+
+
+
+
+
+
+
+
+
+
+
+---
+<h2 id="11.5">11.5 后台查询 Datatales</h2>
+
+---
+
+主要使用的是一个组件 dataTables。   
+cloud-service\manage-backend\src\main\resources\static\pages\permission\permissionList.html
+```
+// 部分code
+<link rel="stylesheet" type="text/css" media="screen" href="../../css/bootstrap.min.css">
+
+<script type="text/javascript" src="../../js/plugin/datatables/jquery.dataTables.min.js"></script>
+<script type="text/javascript" src="../../js/plugin/datatables/dataTables.bootstrap.min.js"></script>
+
+```
+
+这一章节主要是页面查询的发起以及结果的渲染。
+
+可以参考文档[《datatables 分页查询》](readme-03.md)或自行查阅其他资料。
+
+
+
+
+
+
+
+
+
+
