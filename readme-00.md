@@ -29,6 +29,18 @@
 - [11.6 文件上传](#11.6)  
 - [12.1 后台页面单独部署](#12.1)  
 - [12.2 打包](#12.2)  
+- [12.3 elk环境搭建](#12.3)  
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3298,3 +3310,22 @@ java -jar register-center-1.0.jar --server.port=8090 --spring.cloud.config.profi
 系统优先使用脚本里面的配置项。
 
 
+
+
+
+
+
+
+
+
+
+---
+<h2 id="12.3">12.3 elk环境搭建</h2>
+
+---
+
+Linux系统下的elasticsearch已经安装成功。[点击查看更多](https://github.com/xie-chong/interview-learn/tree/master/learn-go/elasticsearch)。
+
+提示：Logstash 和 Kibana 的整合未完成。即重写文档《elk环境搭建》--readme-04.md
+
+可以参考 https://www.cnblogs.com/huangxincheng/p/7918722.html
