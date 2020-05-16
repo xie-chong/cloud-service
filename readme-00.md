@@ -26,7 +26,7 @@
 - [11.3 后台菜单页面](#11.3)  
 - [11.4 后台页面按钮权限粒度控制](#11.4)  
 - [11.5 后台查询 Datatales](#11.5)  
-
+- [11.6 文件上传](#11.6)  
 
 
 
@@ -3130,7 +3130,110 @@ cloud-service\manage-backend\src\main\resources\static\pages\permission\permissi
 
 
 
+---
+<h2 id="11.6">11.6 文件上传</h2>
 
+---
 
+使用组件**layui**组件来做的上传。
+
+cloud-service\manage-backend\src\main\resources\static\pages\user\updateHeadImg.html
+```
+// .......
+url: domainName + '/zuul/api-f/files' //上传接口
+// .......
+```
+
+正常情况下应该是如下所示，但有时候可能存在文件名乱码异常等，所以需要加上/zuul
+```
+url: domainName + '/api-f/files' //上传接口
+```
+
+与此类似的还有文件上传，否则文件名可能乱码。   
+cloud-service\manage-backend\src\main\resources\static\pages\file\fileList.html
+```
+layui.use('upload', function(){
+	var upload = layui.upload;
+	
+	upload.render({
+	    elem: '#test1' //绑定元素
+	    ,accept: 'file' //允许上传的文件类型
+	    ,url: domainName + '/zuul/api-f/files?fileSource=' + $("#fileSource").val()
+	    ,done: function(res, index, upload){
+	    	layer.msg("上传成功");
+		 	example.ajax.reload();
+	    }
+	  });
+```
+
+邮件管理里面的富文本上传,使用的是 **[layedit组件](https://www.layui.com/doc/modules/layedit.html)**   
+cloud-service\manage-backend\src\main\resources\static\pages\mail\addMail.html
+```
+	<script type="text/javascript">
+		var layedit, index;
+		layui.use(['layedit','upload'], function(){
+		  layedit = layui.layedit;
+		  layedit.set({
+              uploadImage: {
+                  url: domainName + '/zuul/api-f/files/layui?access_token='+localStorage.getItem("access_token"),
+                  type: 'post'
+              }
+            });
+		  index = layedit.build('demo');
+		});
+// .......
+```
+
+cloud-service\file-center\src\main\java\com\cloud\file\controller\FileController.java
+```
+@RestController
+@RequestMapping("/files")
+public class FileController {
+
+	@Autowired
+	private FileServiceFactory fileServiceFactory;
+
+	/**
+	 * 文件上传<br>
+	 * 根据fileSource选择上传方式，目前仅实现了上传到本地<br>
+	 * 如有需要可上传到第三方，如阿里云、七牛等
+	 *
+	 * @param file
+	 * @param fileSource
+	 *
+	 * @return
+	 * @throws Exception
+	 */
+	@LogAnnotation(module = "文件上传", recordParam = false)
+	@PostMapping
+	public FileInfo upload(@RequestParam("file") MultipartFile file, String fileSource) throws Exception {
+		FileService fileService = fileServiceFactory.getFileService(fileSource);
+		return fileService.upload(file);
+	}
+
+	/**
+	 * layui富文本文件自定义上传
+	 * 
+	 * @param file
+	 * @param fileSource
+	 * @return
+	 * @throws Exception
+	 */
+	@LogAnnotation(module = "文件上传", recordParam = false)
+	@PostMapping("/layui")
+	public Map<String, Object> uploadLayui(@RequestParam("file") MultipartFile file, String fileSource)
+			throws Exception {
+		FileInfo fileInfo = upload(file, fileSource);
+
+		Map<String, Object> map = new HashMap<>();
+		map.put("code", 0);
+		Map<String, Object> data = new HashMap<>();
+		data.put("src", fileInfo.getUrl());
+		map.put("data", data);
+
+		return map;
+	}
+// .......
+```
 
 
