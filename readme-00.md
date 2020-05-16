@@ -28,7 +28,7 @@
 - [11.5 后台查询 Datatales](#11.5)  
 - [11.6 文件上传](#11.6)  
 - [12.1 后台页面单独部署](#12.1)  
-
+- [12.2 打包](#12.2)  
 
 
 
@@ -3269,5 +3269,32 @@ public class FileController {
 当然也可以不要Tomcat，使用Nginx，只要能带起前端系统即可。
 
 
+
+
+
+
+
+
+
+
+
+---
+<h2 id="12.2">12.2 打包</h2>
+
+---
+
+路径要正确，如果脚本文件和jar文件不在一个目录下，我们需要做一些路径切换```cd```。
+
+windows下的启动脚本 register.cmd
+```
+java -jar register-center-1.0.jar
+```
+
+也可加入其他参数   
+```
+java -jar register-center-1.0.jar --server.port=8090 --spring.cloud.config.profile=dev
+```
+
+系统优先使用脚本里面的配置项。
 
 
