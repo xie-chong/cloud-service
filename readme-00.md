@@ -3361,7 +3361,7 @@ cloud-service\notification-center\pom.xml
 
 存放短信发送的记录```SELECT * FROM t_sms;```，signName 和 templateCode 是创建阿里云模板时生成的。
 
-阿里云短信发送demo-旧版
+**阿里云短信发送demo-旧版**
 ```
 //设置超时时间-可自行调整
 System.setProperty("sun.net.client.defaultConnectTimeout", "10000");
@@ -3401,7 +3401,7 @@ if(sendSmsResponse.getCode() != null && sendSmsResponse.getCode().equals("OK")) 
 }
 ```
 
-阿里云短信发送demo-新版
+**阿里云短信发送demo-新版**
 ```
 import com.aliyuncs.CommonRequest;
 import com.aliyuncs.CommonResponse;
