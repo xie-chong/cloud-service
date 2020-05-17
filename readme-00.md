@@ -3575,6 +3575,8 @@ public class SmsServiceImpl implements SmsService {
 
 ---
 
+[UML-13-2](https://github.com/xie-chong/cloud-service/issues/10)
+
 由于用户可能还没有登录就需要发送短信，所以此种类型的请求不需要设置权限拦截。   
 cloud-service\notification-center\src\main\java\com\cloud\notification\config\ResourceServerConfig.java
 ```
@@ -3863,4 +3865,193 @@ public class AppUserServiceImpl implements AppUserService {
 
 
 
+---
+<h2 id="13.5">13.5 登录重构-支持短信登录</h2>
 
+---
+
+### 提示：
+1. **短信登录无需密码，但security底层有密码校验，我们这里将手机号作为密码，认证中心采用同样规则即可**
+2. **涉及到手机登录验证码校验。**
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\controller\TokenController.java
+```
+/**
+ * 登陆、刷新token、退出
+ *
+ */
+@Slf4j
+@RestController
+public class TokenController {
+
+    @Autowired
+    private Oauth2Client oauth2Client;
+
+    // ......
+
+    /**
+     * 短信登录
+     *
+     * @param phone
+     * @param key
+     * @param code
+     * @return
+     */
+    @PostMapping("/sys/login-sms")
+    public Map<String, Object> smsLogin(String phone, String key, String code) {
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put(OAuth2Utils.GRANT_TYPE, "password");
+        parameters.put(OAuth2Utils.CLIENT_ID, SystemClientInfo.CLIENT_ID);
+        parameters.put("client_secret", SystemClientInfo.CLIENT_SECRET);
+        parameters.put(OAuth2Utils.SCOPE, SystemClientInfo.CLIENT_SCOPE);
+        // 为了支持多类型登录，这里在username后拼装上登录类型，同时为了校验短信验证码，我们也拼上code等
+        parameters.put("username", phone + "|" + CredentialType.PHONE.name() + "|" + key + "|" + code + "|"
+                + DigestUtils.md5Hex(key + code));
+        // 短信登录无需密码，但security底层有密码校验，我们这里将手机号作为密码，认证中心采用同样规则即可
+        parameters.put("password", phone);
+
+        Map<String, Object> tokenInfo = oauth2Client.postAccessToken(parameters);
+        saveLoginLog(phone, "手机号短信登陆");
+
+        return tokenInfo;
+    }
+	// ......
+
+}
+```
+
+cloud-service\gateway-zuul\src\main\java\com\cloud\gateway\feign\Oauth2Client.java
+```
+@FeignClient("oauth-center")
+public interface Oauth2Client {
+
+    /**
+     * 获取access_token<br>
+     * 这是spring-security-oauth2底层的接口，类TokenEndpoint<br>
+     * 感兴趣可看下视频章节05.5 生成access_token的核心源码
+     *
+     * @param parameters
+     * @return
+     * @see org.springframework.security.oauth2.provider.endpoint.TokenEndpoint
+     */
+    @PostMapping(path = "/oauth/token")
+    Map<String, Object> postAccessToken(@RequestParam Map<String, String> parameters);
+
+    /**
+     * 删除access_token和refresh_token<br>
+     * 认证中心的OAuth2Controller方法removeToken
+     *
+     * @param access_token
+     */
+    @DeleteMapping(path = "/remove_token")
+    void removeToken(@RequestParam("access_token") String access_token);
+
+}
+```
+
+org\springframework\security\oauth2\provider\endpoint\TokenEndpoint.class
+```
+@FrameworkEndpoint
+public class TokenEndpoint extends AbstractEndpoint {
+  // ......
+    @RequestMapping(
+        value = {"/oauth/token"},
+        method = {RequestMethod.POST}
+    )
+    public ResponseEntity<OAuth2AccessToken> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+        // ......
+```
+
+cloud-service\oauth-center\src\main\java\com\cloud\oauth\service\impl\UserDetailServiceImpl.java
+```
+/**
+ * 根据用户名获取用户<br>
+ * <p>
+ * 密码校验请看下面两个类
+ *
+ * @see org.springframework.security.authentication.dao.AbstractUserDetailsAuthenticationProvider
+ * @see org.springframework.security.authentication.dao.DaoAuthenticationProvider
+ */
+@Slf4j
+@Service("userDetailsService")
+public class UserDetailServiceImpl implements UserDetailsService {
+
+    @Autowired
+    private UserClient userClient;
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+    @Autowired
+    private SmsClient smsClient;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // 为了支持多类型登录，这里username后面拼装上登录类型,如username|type
+        String[] params = username.split("\\|");
+        username = params[0];// 真正的用户名
+
+        LoginAppUser loginAppUser = userClient.findByUsername(username);
+        if (loginAppUser == null) {
+            throw new AuthenticationCredentialsNotFoundException("用户不存在");
+        } else if (!loginAppUser.isEnabled()) {
+            throw new DisabledException("用户已作废");
+        }
+
+        if (params.length > 1) {
+            // 登录类型
+            CredentialType credentialType = CredentialType.valueOf(params[1]);
+            if (CredentialType.PHONE == credentialType) {// 短信登录
+                handlerPhoneSmsLogin(loginAppUser, params);
+            } else if (CredentialType.WECHAT_OPENID == credentialType) {// 微信登陆
+                handlerWechatLogin(loginAppUser, params);
+            }
+        }
+
+        return loginAppUser;
+    }
+
+	// ......
+
+    /**
+     * 手机号+短信验证码登陆，处理逻辑
+     *
+     * @param loginAppUser
+     * @param params
+     */
+    private void handlerPhoneSmsLogin(LoginAppUser loginAppUser, String[] params) {
+        if (params.length < 5) {
+            throw new IllegalArgumentException("非法请求");
+        }
+
+        String phone = params[0];
+        String key = params[2];
+        String code = params[3];
+        String md5 = params[4];
+        if (!DigestUtils.md5Hex(key + code).equals(md5)) {
+            throw new IllegalArgumentException("非法请求");
+        }
+
+        String value = smsClient.matcheCodeAndGetPhone(key, code, false, 30);
+        if (!StringUtils.equals(phone, value)) {
+            throw new IllegalArgumentException("验证码错误");
+        }
+
+        // 其实这里是将密码重置，网关层的短信登录接口，密码也用同样规则即可
+        loginAppUser.setPassword(passwordEncoder.encode(phone));
+        log.info("手机号+短信验证码登陆，{},{}", phone, code);
+    }
+
+}
+```
+
+用户查询SQL（[参考说明](#04.7)）：   
+cloud-service\user-center\src\main\java\com\cloud\user\dao\UserCredentialsDao.java
+```
+@Mapper
+public interface UserCredentialsDao {
+
+	// ......
+
+	@Select("select u.* from app_user u inner join user_credentials c on c.userId = u.id where c.username = #{username}")
+	AppUser findUserByUsername(String username);
+}
+```
