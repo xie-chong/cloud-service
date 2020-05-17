@@ -31,6 +31,19 @@
 - [12.2 打包](#12.2)  
 - [12.3 elk环境搭建](#12.3)  
 - [13.1 通知中心-阿里云短信](#13.1)  
+- [13.2 发送短信验证码](#13.2)  
+- [13.3 校验短信验证码](#13.3)  
+- [13.4 用户绑定手机号](#13.4)  
+- [13.5 登录重构-支持短信登录](#13.5)  
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3557,6 +3570,289 @@ public class SmsServiceImpl implements SmsService {
 
 
 
+---
+<h2 id="13.2">13.2 发送短信验证码</h2>
+
+---
+
+由于用户可能还没有登录就需要发送短信，所以此种类型的请求不需要设置权限拦截。
+cloud-service\notification-center\src\main\java\com\cloud\notification\config\ResourceServerConfig.java
+```
+/** 资源服务配置 */
+@EnableResourceServer
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
+
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		http.csrf().disable().exceptionHandling()
+				.authenticationEntryPoint(
+						(request, response, authException) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+				.and().authorizeRequests().antMatchers(PermitAllUrl.permitAllUrl("/notification-anon/**")).permitAll() // 放开权限的url
+				.anyRequest().authenticated().and().httpBasic();
+	}
+
+}
+```
+
+发送手机验证码不应该和手机号绑定，因为有好多场景需要发送验证码。我们生成一个key(uuid)和验证码生成对应关系，并把key返回给前端。后续前端把key和收到的短信验证码传给后台校验，是否是正确。
+
+* redis来缓存验证码，其中key为```"sms:" + uuid```，value为手机号和验证码，并设置过期时间。
+```
+stringRedisTemplate.opsForValue().set(smsRedisKey(uuid), JSONObject.toJSONString(map), expireMinute, TimeUnit.MINUTES);
+```
+* redis还缓存了该手机号今天发送短信的次数，key为```"sms:count:" + LocalDate.now().toString() + ":" + phone```并设置当天有效。
+
+```
+stringRedisTemplate.opsForValue().increment(countKey, 1L);
+stringRedisTemplate.expire(countKey, 1, TimeUnit.DAYS);
+```
+
+cloud-service\notification-center\src\main\java\com\cloud\notification\controller\SmsController.java
+```
+@RestController
+public class SmsController {
+
+	@Autowired
+	private VerificationCodeService verificationCodeService;
+
+	/** 发送短信验证码 */
+	@PostMapping(value = "/notification-anon/codes", params = { "phone" })
+	public VerificationCode sendSmsVerificationCode(String phone) {
+		if (!PhoneUtil.checkPhone(phone)) {
+			throw new IllegalArgumentException("手机号格式不正确");
+		}
+
+		VerificationCode verificationCode = verificationCodeService.generateCode(phone);
+
+		return verificationCode;
+	}
+	// ......
+}
+```
+
+
+
+
+
+
+
+---
+<h2 id="13.3">13.3 校验短信验证码</h2>
+
+---
+
+cloud-service\notification-center\src\main\java\com\cloud\notification\controller\SmsController.java
+```
+@RestController
+public class SmsController {
+
+	@Autowired
+	private VerificationCodeService verificationCodeService;
+	// ......
+
+	/**
+	 * 根据验证码和key获取手机号
+	 * 
+	 * @param key
+	 * @param code
+	 * @param delete
+	 *            是否删除key
+	 * @param second
+	 *            不删除时，可重置过期时间（秒）
+	 * @return
+	 */
+	@GetMapping(value = "/notification-anon/internal/phone", params = { "key", "code" })
+	public String matcheCodeAndGetPhone(String key, String code, Boolean delete, Integer second) {
+		return verificationCodeService.matcheCodeAndGetPhone(key, code, delete, second);
+	}
+	
+	// .......
+}
+```
+
+cloud-service\notification-center\src\main\java\com\cloud\notification\service\impl\VerificationCodeServiceImpl.java
+```
+@Slf4j
+@Service
+public class VerificationCodeServiceImpl implements VerificationCodeService {
+	// ......
+	@Override
+	public String matcheCodeAndGetPhone(String key, String code, Boolean delete, Integer second) {
+		key = smsRedisKey(key);
+
+		String value = stringRedisTemplate.opsForValue().get(key);
+		if (value != null) {
+			JSONObject json = JSONObject.parseObject(value);
+			if (code != null && code.equals(json.getString("code"))) {
+				log.info("验证码校验成功：{}", value);
+
+				if (delete == null || delete) {
+					stringRedisTemplate.delete(key);
+				}
+
+				if (delete == Boolean.FALSE && second != null && second > 0) {
+					stringRedisTemplate.expire(key, second, TimeUnit.SECONDS);
+				}
+
+				return json.getString("phone");
+			}
+
+		}
+
+		return null;
+	}
+}
+```
+
+**为什么要返回手机号呢？**   
+为了避免A手机发送验证码，却使用B手机做绑定，我们要始终保持redis里面存储的验证码和手机号保持一致。
+
+
+
+---
+<h2 id="13.4">13.4 用户绑定手机号</h2>
+
+---
+
+页面点击“发送”时发送短信验证码（notification-center），点击“提交”之后做绑定（user-ceenter）。
+
+cloud-service\manage-backend\src\main\resources\static\pages\user\bindingPhone.html
+```
+	// ......
+	// 发送验证码
+	function sendSms(){
+		var phone = $("#phone").val();
+		if(phone == null || phone == ""){
+			layer.msg("手机号不能为空");
+			return;
+		}
+		if(!myreg.test(phone)){
+			layer.msg("手机号格式不正确");
+			return;
+		}
+		
+		$.ajax({
+			type : 'post',
+			url : domainName + '/api-n/notification-anon/codes?phone='+phone,
+			contentType: "application/json; charset=utf-8",  
+			success : function(data) {
+                $("#key").val(data.key);
+                $("#btnSendCode").attr("disabled", true);
+                $("#codeDiv").show();
+                $("#submitDiv").show();
+                settime();
+			}
+		});
+	}
+	// ......
+```
+
+```
+	// ......
+	// 手机号绑定
+	function update() {
+		var key = $("#key").val();
+		var code = $("#code").val();
+		var phone = $("#phone").val();
+		if(code == null || code == ""){
+			layer.msg("验证码不能为空");
+			return;
+		}
+		if(phone == null || phone == ""){
+			layer.msg("phone不能为空");
+			return;
+		}
+
+		$.ajax({
+			type : 'post',
+			url : domainName + '/api-u/users/binding-phone?key='+key+"&code="+code+"&phone="+phone,
+			contentType: "application/json; charset=utf-8",  
+			success : function(data) {
+				layer.msg("绑定成功", {shift: -1, time: 1000}, function(){
+					refresh_token(); //刷新当前登录用户缓存
+					deleteCurrentTab();
+                });
+			}
+		});
+	}
+```
+
+cloud-service\user-center\src\main\java\com\cloud\user\controller\UserController.java
+```
+@Slf4j
+@RestController
+public class UserController {
+	// ......
+	
+    /**
+     * 绑定手机号
+     *
+     * @param phone
+     * @param key
+     * @param code
+     */
+    @LogAnnotation(module = "绑定手机号")
+    @PostMapping(value = "/users/binding-phone")
+    public void bindingPhone(String phone, String key, String code) {
+        if (StringUtils.isBlank(phone)) {
+            throw new IllegalArgumentException("手机号不能为空");
+        }
+
+        if (StringUtils.isBlank(key)) {
+            throw new IllegalArgumentException("key不能为空");
+        }
+
+        if (StringUtils.isBlank(code)) {
+            throw new IllegalArgumentException("code不能为空");
+        }
+
+        LoginAppUser loginAppUser = AppUserUtil.getLoginAppUser();
+        log.info("绑定手机号，key:{},code:{},username:{}", key, code, loginAppUser.getUsername());
+
+        String value = smsClient.matcheCodeAndGetPhone(key, code, false, 30);
+        if (value == null) {
+            throw new IllegalArgumentException("验证码错误");
+        }
+
+        if (phone.equals(value)) {
+            appUserService.bindingPhone(loginAppUser.getId(), phone);
+        } else {
+            throw new IllegalArgumentException("手机号不一致");
+        }
+    }
+}
+```
+
+D:\Workspace-IntelliJ\cloud-service\user-center\src\main\java\com\cloud\user\service\impl\AppUserServiceImpl.java
+```
+@Slf4j
+@Service
+public class AppUserServiceImpl implements AppUserService {
+	// .......
+	
+   /**  绑定手机号 */
+    @Transactional
+    @Override
+    public void bindingPhone(Long userId, String phone) {
+        UserCredential userCredential = userCredentialsDao.findByUsername(phone);
+        if (userCredential != null) {
+            throw new IllegalArgumentException("手机号已被绑定");
+        }
+
+        AppUser appUser = appUserDao.findById(userId);
+        appUser.setPhone(phone);
+
+        updateAppUser(appUser);
+        log.info("绑定手机号成功,username:{}，phone:{}", appUser.getUsername(), phone);
+
+        // 绑定成功后，将手机号存到用户凭证表，后续可通过手机号+密码或者手机号+短信验证码登陆
+        userCredentialsDao.save(new UserCredential(phone, CredentialType.PHONE.name(), userId));
+    }
+
+}
+```
 
 
 
