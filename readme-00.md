@@ -30,7 +30,7 @@
 - [12.1 后台页面单独部署](#12.1)  
 - [12.2 打包](#12.2)  
 - [12.3 elk环境搭建](#12.3)  
-
+- [13.1 通知中心-阿里云短信](#13.1)  
 
 
 
@@ -3329,3 +3329,242 @@ Linux系统下的elasticsearch已经安装成功。[点击查看更多](https://
 提示：Logstash 和 Kibana 的整合未完成。即重写文档《elk环境搭建》--readme-04.md
 
 可以参考 https://www.cnblogs.com/huangxincheng/p/7918722.html
+
+
+
+
+
+
+
+
+
+---
+<h2 id="13.1">13.1 通知中心-阿里云短信</h2>
+
+---
+
+[阿里云-云通讯-短信服务](https://www.aliyun.com/product/sms)
+
+cloud-service\notification-center\pom.xml
+```
+		<dependency>
+			<groupId>com.aliyun</groupId>
+			<artifactId>aliyun-java-sdk-core</artifactId>
+			<version>${aliyun-sdk-core.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.aliyun</groupId>
+			<artifactId>aliyun-java-sdk-dysmsapi</artifactId>
+			<version>${aliyun-sdk-dysmsapi.version}</version>
+		</dependency>
+```
+
+存放短信发送的记录```SELECT * FROM t_sms;```，signName 和 templateCode 是创建阿里云模板时生成的。
+
+阿里云短信发送demo-旧版
+```
+//设置超时时间-可自行调整
+System.setProperty("sun.net.client.defaultConnectTimeout", "10000");
+System.setProperty("sun.net.client.defaultReadTimeout", "10000");
+//初始化ascClient需要的几个参数
+final String product = "Dysmsapi";//短信API产品名称（短信产品名固定，无需修改）
+final String domain = "dysmsapi.aliyuncs.com";//短信API产品域名（接口地址固定，无需修改）
+//替换成你的AK
+final String accessKeyId = "yourAccessKeyId";//你的accessKeyId,参考本文档步骤2
+final String accessKeySecret = "yourAccessKeySecret";//你的accessKeySecret，参考本文档步骤2
+//初始化ascClient,暂时不支持多region（请勿修改）
+IClientProfile profile = DefaultProfile.getProfile("cn-hangzhou", accessKeyId,
+accessKeySecret);
+DefaultProfile.addEndpoint("cn-hangzhou", "cn-hangzhou", product, domain);
+IAcsClient acsClient = new DefaultAcsClient(profile);
+ //组装请求对象
+ SendSmsRequest request = new SendSmsRequest();
+ //使用post提交
+ request.setMethod(MethodType.POST);
+ //必填:待发送手机号。支持以逗号分隔的形式进行批量调用，批量上限为1000个手机号码,批量调用相对于单条调用及时性稍有延迟,验证码类型的短信推荐使用单条调用的方式；发送国际/港澳台消息时，接收号码格式为国际区号+号码，如“85200000000”
+ request.setPhoneNumbers("1500000000");
+ //必填:短信签名-可在短信控制台中找到
+ request.setSignName("云通信");
+ //必填:短信模板-可在短信控制台中找到，发送国际/港澳台消息时，请使用国际/港澳台短信模版
+ request.setTemplateCode("SMS_1000000");
+ //可选:模板中的变量替换JSON串,如模板内容为"亲爱的${name},您的验证码为${code}"时,此处的值为
+ //友情提示:如果JSON中需要带换行符,请参照标准的JSON协议对换行符的要求,比如短信内容中包含\r\n的情况在JSON中需要表示成\\r\\n,否则会导致JSON在服务端解析失败
+ request.setTemplateParam("{\"name\":\"Tom\", \"code\":\"123\"}");
+ //可选-上行短信扩展码(扩展码字段控制在7位或以下，无特殊需求用户请忽略此字段)
+ //request.setSmsUpExtendCode("90997");
+ //可选:outId为提供给业务方扩展字段,最终在短信回执消息中将此值带回给调用者
+ request.setOutId("yourOutId");
+//请求失败这里会抛ClientException异常
+SendSmsResponse sendSmsResponse = acsClient.getAcsResponse(request);
+if(sendSmsResponse.getCode() != null && sendSmsResponse.getCode().equals("OK")) {
+//请求成功
+}
+```
+
+阿里云短信发送demo-新版
+```
+import com.aliyuncs.CommonRequest;
+import com.aliyuncs.CommonResponse;
+import com.aliyuncs.DefaultAcsClient;
+import com.aliyuncs.IAcsClient;
+import com.aliyuncs.exceptions.ClientException;
+import com.aliyuncs.exceptions.ServerException;
+import com.aliyuncs.http.MethodType;
+import com.aliyuncs.profile.DefaultProfile;
+/*
+pom.xml
+<dependency>
+  <groupId>com.aliyun</groupId>
+  <artifactId>aliyun-java-sdk-core</artifactId>
+  <version>4.5.0</version>
+</dependency>
+*/
+public class SendSms {
+    public static void main(String[] args) {
+        DefaultProfile profile = DefaultProfile.getProfile("cn-hangzhou", "<accessKeyId>", "<accessSecret>");
+        IAcsClient client = new DefaultAcsClient(profile);
+
+        CommonRequest request = new CommonRequest();
+        request.setSysMethod(MethodType.POST);
+        request.setSysDomain("dysmsapi.aliyuncs.com");
+        request.setSysVersion("2017-05-25");
+        request.setSysAction("SendSms");
+        request.putQueryParameter("RegionId", "cn-hangzhou");
+        try {
+            CommonResponse response = client.getCommonResponse(request);
+            System.out.println(response.getData());
+        } catch (ServerException e) {
+            e.printStackTrace();
+        } catch (ClientException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+**cloud-service 项目中的实例**：   
+
+cloud-service\config-center\src\main\resources\configs\dev\notification-center.yml
+```
+# ......
+aliyun:
+  accessKeyId: xxx
+  accessKeySecret: xxx
+  sign:
+    name1: xxx
+  template:
+    code1: xxx
+sms:
+  expire-minute: 15
+  day-count: 30
+```
+
+cloud-service\notification-center\src\main\java\com\cloud\notification\config\AliyunSmsConfig.java
+```
+/** 阿里云短信配置 */
+@Configuration
+public class AliyunSmsConfig {
+
+	@Value("${aliyun.accessKeyId}")
+	private String accessKeyId;
+	@Value("${aliyun.accessKeySecret}")
+	private String accessKeySecret;
+
+	@Bean
+	public IAcsClient iAcsClient() throws ClientException {
+		// 设置超时时间-可自行调整
+		System.setProperty("sun.net.client.defaultConnectTimeout", "10000");
+		System.setProperty("sun.net.client.defaultReadTimeout", "10000");
+		// 初始化ascClient需要的几个参数
+		final String product = "Dysmsapi";// 短信API产品名称（短信产品名固定，无需修改）
+		final String domain = "dysmsapi.aliyuncs.com";// 短信API产品域名（接口地址固定，无需修改）
+		// 初始化ascClient,暂时不支持多region（请勿修改）
+		IClientProfile profile = DefaultProfile.getProfile("cn-hangzhou", accessKeyId, accessKeySecret);
+		DefaultProfile.addEndpoint("cn-hangzhou", "cn-hangzhou", product, domain);
+
+		IAcsClient acsClient = new DefaultAcsClient(profile);
+
+		return acsClient;
+	}
+	
+}
+```
+
+cloud-service\notification-center\src\main\java\com\cloud\notification\service\impl\SmsServiceImpl.java
+```
+@Slf4j
+@Service
+public class SmsServiceImpl implements SmsService {
+
+	@Autowired
+	private IAcsClient acsClient;
+	@Value("${aliyun.sign.name1}")
+	private String signName;
+	@Value("${aliyun.template.code1}")
+	private String templateCode;
+
+	@Autowired
+	private SmsDao smsDao;
+
+	/** 异步发送阿里云短信 */
+	@Async
+	@Override
+	public SendSmsResponse sendSmsMsg(Sms sms) {
+		if (sms.getSignName() == null) {
+			sms.setSignName(this.signName);
+		}
+
+		if (sms.getTemplateCode() == null) {
+			sms.setTemplateCode(this.templateCode);
+		}
+
+		// 阿里云短信官网demo代码
+		SendSmsRequest request = new SendSmsRequest();
+		request.setMethod(MethodType.POST);
+		request.setPhoneNumbers(sms.getPhone());
+		request.setSignName(sms.getSignName());
+		request.setTemplateCode(sms.getTemplateCode());
+		request.setTemplateParam(sms.getParams());
+		request.setOutId(sms.getId().toString());
+
+		SendSmsResponse response = null;
+		try {
+			response = acsClient.getAcsResponse(request);
+			if (response != null) {
+				log.info("发送短信结果：code:{}，message:{}，requestId:{}，bizId:{}", response.getCode(), response.getMessage(),
+						response.getRequestId(), response.getBizId());
+
+				sms.setCode(response.getCode());
+				sms.setMessage(response.getMessage());
+				sms.setBizId(response.getBizId());
+			}
+		} catch (ClientException e) {
+			e.printStackTrace();
+		}
+
+		update(sms);
+
+		return response;
+	}
+// ......
+
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
