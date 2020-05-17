@@ -3575,7 +3575,7 @@ public class SmsServiceImpl implements SmsService {
 
 ---
 
-由于用户可能还没有登录就需要发送短信，所以此种类型的请求不需要设置权限拦截。
+由于用户可能还没有登录就需要发送短信，所以此种类型的请求不需要设置权限拦截。   
 cloud-service\notification-center\src\main\java\com\cloud\notification\config\ResourceServerConfig.java
 ```
 /** 资源服务配置 */
@@ -3825,7 +3825,7 @@ public class UserController {
 }
 ```
 
-D:\Workspace-IntelliJ\cloud-service\user-center\src\main\java\com\cloud\user\service\impl\AppUserServiceImpl.java
+cloud-service\user-center\src\main\java\com\cloud\user\service\impl\AppUserServiceImpl.java
 ```
 @Slf4j
 @Service
