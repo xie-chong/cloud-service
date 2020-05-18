@@ -208,7 +208,7 @@ public class ZipkinProperties {
 
 ---
 
-Zipkin默认是只收集0.1比率的数据的，这个参数可以修改，是由客户端调用者自己来设置的，这里注意下，不是zipkin服务端，是客户端，如用户系统参数是```spring.sleuth.sampler.percentage=0.1```
+Zipkin默认是只收集0.1比率的数据的，这个参数可以修改，是**由客户端调用者自己来设置**的，这里注意下，不是zipkin服务端，是客户端，如用户系统参数是```spring.sleuth.sampler.percentage=0.1```
 
 这个参数如果没有配置，将默认采用0.1，如要修改的话，你可自行添加该参数到配置文件里，如下所示
 
