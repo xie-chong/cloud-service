@@ -176,6 +176,29 @@ spring:
       type: web
 ```
 
+源码类 org\springframework\cloud\sleuth\zipkin2\ZipkinProperties.class
+
+```
+@ConfigurationProperties("spring.zipkin")
+public class ZipkinProperties {
+    private String baseUrl = "http://localhost:9411/";
+    private Boolean discoveryClientEnabled;
+    private boolean enabled = true;
+    private int messageTimeout = 1;
+    private SpanBytesEncoder encoder;
+    private ZipkinProperties.Compression compression;
+    private ZipkinProperties.Service service;
+    private ZipkinProperties.Locator locator;
+
+    public ZipkinProperties() {
+        this.encoder = SpanBytesEncoder.JSON_V2;
+        this.compression = new ZipkinProperties.Compression();
+        this.service = new ZipkinProperties.Service();
+        this.locator = new ZipkinProperties.Locator();
+    }
+// ......
+```
+
 
 
 
@@ -187,7 +210,7 @@ spring:
 
 Zipkin默认是只收集0.1比率的数据的，这个参数可以修改，是由客户端调用者自己来设置的，这里注意下，不是zipkin服务端，是客户端，如用户系统参数是```spring.sleuth.sampler.percentage=0.1```
 
-源码类是 org.springframework.cloud.sleuth.sampler.SamplerProperties，这个参数我们源码里没有配置，将默认采用0.1，如要修改的话，你可自行添加该参数到配置文件里，如下所示
+这个参数如果没有配置，将默认采用0.1，如要修改的话，你可自行添加该参数到配置文件里，如下所示
 
 ```
 spring:
@@ -203,6 +226,26 @@ spring:
 
 取值范围是0-1，如改成1的话，将收集全部请求。
 
+
+源码类是 org\springframework\cloud\sleuth\sampler\SamplerProperties.class
+
+```
+@ConfigurationProperties("spring.sleuth.sampler")
+public class SamplerProperties {
+    private float probability = 0.1F;
+
+    public SamplerProperties() {
+    }
+
+    public float getProbability() {
+        return this.probability;
+    }
+
+    public void setProbability(float probability) {
+        this.probability = probability;
+    }
+}
+```
 
 
 
