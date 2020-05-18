@@ -49,9 +49,9 @@ https://zipkin.io/pages/quickstart.html
 >**Java**
 >If you have Java 8 or higher installed, the quickest way to get started is to fetch the latest release as a self-contained executable jar:
 >```
-curl -sSL https://zipkin.io/quickstart.sh | bash -s
-java -jar zipkin.jar
-```
+>curl -sSL https://zipkin.io/quickstart.sh | bash -s
+>java -jar zipkin.jar
+>```
 
 zipkin官方源码的github地址: https://github.com/openzipkin/zipkin   
 打开这个网址，往下翻，在Quick-start里面，点击一下 latest released server ，点击后，将会下载一个可执行的jar，可理解为就像我们的spring boot项目打成的jar。
@@ -382,20 +382,20 @@ http方式需要修改为false（该参数要注入false）
 **如内存存储**
 
 ```
-java -jar zipkin-server-2.8.3-exec.jar --QUERY_PORT=9411 --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
+java -jar zipkin-server-2.21.1-exec.jar --QUERY_PORT=9411 --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
 ```
 
 **mysql存储**
 
 ```
-java -jar zipkin-server-2.8.3-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=mysql --MYSQL_HOST=localhost --MYSQL_TCP_PORT=3306 --MYSQL_USER=root --MYSQL_PASS=root --MYSQL_DB=zipkin --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
+java -jar zipkin-server-2.21.1-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=mysql --MYSQL_HOST=localhost --MYSQL_TCP_PORT=3306 --MYSQL_USER=root --MYSQL_PASS=root --MYSQL_DB=zipkin --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
 ```
 
 
 **elasticsearch存储**
 
 ```
-java -jar zipkin-server-2.8.3-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=elasticsearch --ES_HOSTS=http://localhost:9200 --ES_INDEX=zipkin --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
+java -jar zipkin-server-2.21.1-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=elasticsearch --ES_HOSTS=http://localhost:9200 --ES_INDEX=zipkin --HTTP_COLLECTOR_ENABLED=false --RABBIT_ADDRESSES=localhost:5672 --RABBIT_USER=cloud-dev --RABBIT_PASSWORD=cloud-dev --RABBIT_VIRTUAL_HOST=/
 ```
 
 **其实就是在第二章的参数基础上加上**
@@ -415,7 +415,7 @@ java -jar zipkin-server-2.8.3-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=elastics
 
 ---
 
-1. 客户端要添加rabbitmq依赖
+#### 1. 客户端要添加rabbitmq依赖
 
 ```
 <dependency>
@@ -427,7 +427,7 @@ java -jar zipkin-server-2.8.3-exec.jar --QUERY_PORT=9411 --STORAGE_TYPE=elastics
 我们的微服务gateway-zuul和oauth-center暂时未添加mq依赖，需要在这两个服务的pom文件里添加依赖。别的服务因为引入了log-stater，log-stater里已经引入了rabbitmq，因此别的服务pom不需要改动。
 
 
-2. 配置参数需要修改
+#### 2. 配置参数需要修改
 
 我们默认的在配置中心，各个微服务里
 
