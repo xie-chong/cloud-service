@@ -1,4 +1,4 @@
-# <p align="center">ziokin 追踪</p>
+# <p align="center">zipkin 追踪</p>
 
 - [1. Zipkin下载](#1)   
   - [1.1 官网](#1.1)   
