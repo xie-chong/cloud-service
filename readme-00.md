@@ -39,9 +39,9 @@
 - [？14.2 微信授权服务端代码讲解](#14.2)   
 - [？14.3 微信授权简单页面逻辑](#14.3)   
 - [？14.4 微信授权简单页面（补充）](#14.4)   
-- [？15.1 zipkin 下载安装运行](#15.1)   
-- [？15.2 zipkin 配置](#15.2)   
-- [？15.3 zipkin 使用和修改收集比率](#15.3)   
+- [15.1 zipkin 下载安装运行](#15.1)   
+- [15.2 zipkin 配置](#15.2)   
+- [15.3 zipkin 使用和修改收集比率](#15.3)   
 
 
 ---
@@ -4116,10 +4116,12 @@ public interface UserCredentialsDao {
 ---
 
 
+参考文档[《readme-06.md》](readme-06.md)
 
 
+当系统中存在多个错综复杂的微服务之间相互调用时，zipkin可以帮助我们很好的理顺调用逻辑。
 
-
+一个traceId对应多个spanId。
 
 
 ---
@@ -4127,12 +4129,53 @@ public interface UserCredentialsDao {
 
 ---
 
+### 1. 添加zipkin依赖
 
+```
+<dependency>
+   <groupId>org.springframework.cloud</groupId>
+   <artifactId>spring-cloud-starter-zipkin</artifactId>
+   <version>${starter-zipkin.version}</version>
+</dependency>
+```
 
+### 2. 添加配置
 
+需要再配置文件中添加zipkin配置信息
 
+```
+spring:
+  zipkin:
+    base-url: http://localhost:9411
+    enabled: true
+    sender:
+      type: web
+```
 
+配置了，如果不使用，也不会报错。
 
+源码类 org\springframework\cloud\sleuth\zipkin2\ZipkinProperties.class
+
+```
+@ConfigurationProperties("spring.zipkin")
+public class ZipkinProperties {
+    private String baseUrl = "http://localhost:9411/";
+    private Boolean discoveryClientEnabled;
+    private boolean enabled = true;
+    private int messageTimeout = 1;
+    private SpanBytesEncoder encoder;
+    private ZipkinProperties.Compression compression;
+    private ZipkinProperties.Service service;
+    private ZipkinProperties.Locator locator;
+
+    public ZipkinProperties() {
+        this.encoder = SpanBytesEncoder.JSON_V2;
+        this.compression = new ZipkinProperties.Compression();
+        this.service = new ZipkinProperties.Service();
+        this.locator = new ZipkinProperties.Locator();
+    }
+// ......
+```
 
 
 ---
@@ -4140,9 +4183,44 @@ public interface UserCredentialsDao {
 
 ---
 
+Zipkin默认是只收集0.1比率的数据的，这个参数可以修改，是由客户端调用者自己来设置的，这里注意下，不是zipkin服务端，是客户端，如用户系统参数是```spring.sleuth.sampler.percentage=0.1```
+
+这个参数如果没有配置，将默认采用0.1，如要修改的话，你可自行添加该参数到配置文件里，如下所示
+
+```
+spring:
+  zipkin:
+    base-url: http://localhost:9411
+    enabled: true
+    sender:
+      type: web
+  sleuth:
+    sampler:
+      percentage: 0.1
+```
+
+取值范围是0-1，如改成1的话，将收集全部请求。
 
 
+源码类是 org\springframework\cloud\sleuth\sampler\SamplerProperties.class
 
+```
+@ConfigurationProperties("spring.sleuth.sampler")
+public class SamplerProperties {
+    private float probability = 0.1F;
+
+    public SamplerProperties() {
+    }
+
+    public float getProbability() {
+        return this.probability;
+    }
+
+    public void setProbability(float probability) {
+        this.probability = probability;
+    }
+}
+```
 
 
 
