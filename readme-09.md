@@ -129,7 +129,7 @@ requirepass aaaa
 # bind 127.0.0.1
 ```
 
-同样启动命名用：**redis-server redis.windows.conf**
+同样启动命令用：**redis-server redis.windows.conf**
 
 
 
@@ -147,7 +147,7 @@ requirepass aaaa
 
 ---
 
-用启动命名 **redis-server redis.windows.conf** 启动一个redis实例，该实例比如端口是6379，那么这个实例就是我们的master了。
+用启动命令 **redis-server redis.windows.conf** 启动一个redis实例，该实例比如端口是6379，那么这个实例就是我们的master了。
 
 
 
@@ -293,7 +293,10 @@ spring:
 **哨兵模式配置**，如下所示：
 
 ```
+spring:
   redis:
+    # host: local.redis.com #哨兵模式下不用配置
+    # port: 6379 #哨兵模式下不用配置
     sentinel:
       master: mymaster
       nodes: localhost:26379,localhost:26479,localhost:26579
